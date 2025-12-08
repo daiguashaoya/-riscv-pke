@@ -7,6 +7,7 @@
 #include "strap.h"
 #include "syscall.h"
 
+
 #include "spike_interface/spike_utils.h"
 
 //
@@ -38,8 +39,8 @@ void handle_mtimer_trap() {
   // TODO (lab1_3): increase g_ticks to record this "tick", and then clear the "SIP"
   // field in sip register.
   // hint: use write_csr to disable the SIP_SSIP bit in sip.
-  panic( "lab1_3: increase g_ticks by one, and clear SIP field in sip register.\n" );
-
+  g_ticks+=1;
+  write_csr(sip, read_csr(sip) & ~SIP_SSIP);
 }
 
 //
