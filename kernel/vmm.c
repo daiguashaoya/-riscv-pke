@@ -22,6 +22,7 @@ int map_pages(pagetable_t page_dir, uint64 va, uint64 size, uint64 pa, int perm)
 
   for (first = ROUNDDOWN(va, PGSIZE), last = ROUNDDOWN(va + size - 1, PGSIZE);
       first <= last; first += PGSIZE, pa += PGSIZE) {
+    // ==0只能是 页表项不存在而且不让创建
     if ((pte = page_walk(page_dir, first, 1)) == 0) return -1;
     if (*pte & PTE_V)
       panic("map_pages fails on mapping va (0x%lx) to pa (0x%lx)", first, pa);
@@ -161,7 +162,7 @@ void *user_va_to_pa(pagetable_t page_dir, void *va) {
   // Also, it is possible that "va" is not mapped at all. in such case, we can find
   // invalid PTE, and should return NULL.
   uint64 va_val = (uint64)va;
-  pte_t* pte=page_walk(page_dir,va_val,1);
+  pte_t* pte=page_walk(page_dir,va_val,0);
   // 先判断是否有效
   if(pte==0 || (*pte&PTE_V)==0)
     return NULL;
@@ -189,6 +190,14 @@ void user_vm_unmap(pagetable_t page_dir, uint64 va, uint64 size, int free) {
   // (use free_page() defined in pmm.c) the physical pages. lastly, invalidate the PTEs.
   // as naive_free reclaims only one page at a time, you only need to consider one page
   // to make user/app_naive_malloc to behave correctly.
-  panic( "You have to implement user_vm_unmap to free pages using naive_free in lab2_2.\n" );
-
+  pte_t * pte=page_walk(page_dir,va,0);
+  if(pte==0||((*pte)&PTE_V) ==0)
+    return;
+  // 获取物理地址
+  uint64 pa=PTE2PA(*pte);
+  if(free)
+  {
+    free_page((void *)pa);
+  }
+  *pte=(*pte)&(~PTE_V);
 }
