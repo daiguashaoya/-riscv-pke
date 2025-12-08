@@ -50,7 +50,7 @@ uint64 prot_to_type(int prot, int user) {
 pte_t *page_walk(pagetable_t page_dir, uint64 va, int alloc) {
   if (va >= MAXVA) panic("page_walk");
 
-  // starting from the page directory
+  // 当前页目录首地址
   pagetable_t pt = page_dir;
 
   // traverse from page directory to page table.
@@ -58,7 +58,7 @@ pte_t *page_walk(pagetable_t page_dir, uint64 va, int alloc) {
   // page medium dir, and page table.
   for (int level = 2; level > 0; level--) {
     // macro "PX" gets the PTE index in page table of current level
-    // "pte" points to the entry of current level
+    // 取出对应VPN[]
     pte_t *pte = pt + PX(level, va);
 
     // now, we need to know if above pte is valid (established mapping to a phyiscal page)
@@ -68,6 +68,7 @@ pte_t *page_walk(pagetable_t page_dir, uint64 va, int alloc) {
       pt = (pagetable_t)PTE2PA(*pte);
     } else { //PTE invalid (not exist).
       // allocate a page (to be the new pagetable), if alloc == 1
+      // 根据alloc判断是否需要分配新的页表
       if( alloc && ((pt = (pte_t *)alloc_page(1)) != 0) ){
         memset(pt, 0, PGSIZE);
         // writes the physical address of newly allocated page to pte, to establish the
@@ -159,8 +160,12 @@ void *user_va_to_pa(pagetable_t page_dir, void *va) {
   // (va & (1<<PGSHIFT -1)) means computing the offset of "va" inside its page.
   // Also, it is possible that "va" is not mapped at all. in such case, we can find
   // invalid PTE, and should return NULL.
-  panic( "You have to implement user_va_to_pa (convert user va to pa) to print messages in lab2_1.\n" );
-
+  uint64 va_val = (uint64)va;
+  pte_t* pte=page_walk(page_dir,va_val,1);
+  // 先判断是否有效
+  if(pte==0 || (*pte&PTE_V)==0)
+    return NULL;
+  return (void *)(PTE2PA(*pte)+(va_val&((1<<PGSHIFT)-1)));
 }
 
 //
