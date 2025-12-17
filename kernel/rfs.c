@@ -494,7 +494,13 @@ struct vinode *rfs_create(struct vinode *parent, struct dentry *sub_dentry) {
   // nlinks, i.e., the number of links.
   // blocks, i.e., its block count.
   // Note: DO NOT DELETE CODE BELOW PANIC.
-  panic("You need to implement the code of populating a disk inode in lab4_1.\n" );
+  free_dinode->size = 0;
+  // 普通文件
+  free_dinode->type = R_FILE;
+  // 父目录的一个引用
+  free_dinode->nlinks = 1;
+  // 后续立马分配一个磁盘块
+  free_dinode->blocks = 1;
 
   // DO NOT REMOVE ANY CODE BELOW.
   // allocate a free block for the file
@@ -779,6 +785,7 @@ int rfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset) {
   struct rfs_dir_cache *dir_cache =
       (struct rfs_dir_cache *)dir_vinode->i_fs_info;
   struct rfs_direntry *p_direntry = dir_cache->dir_base_addr + direntry_index;
+  // 到这里p_direntry 就指向了该目录文件的第 offset 个目录项
 
   // TODO (lab4_2): implement the code to read a directory entry.
   // hint: in the above code, we had found the directory entry that located at the
@@ -787,7 +794,8 @@ int rfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset) {
   // the method of returning is to popular proper members of "dir", more specifically,
   // dir->name and dir->inum.
   // note: DO NOT DELETE CODE BELOW PANIC.
-  panic("You need to implement the code for reading a directory entry of rfs in lab4_2.\n" );
+  strcpy(dir->name, p_direntry->name);
+  dir->inum = p_direntry->inum;
 
   // DO NOT DELETE CODE BELOW.
   (*offset)++;
