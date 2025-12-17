@@ -492,7 +492,13 @@ struct vinode *rfs_create(struct vinode *parent, struct dentry *sub_dentry) {
   // nlinks, i.e., the number of links.
   // blocks, i.e., its block count.
   // Note: DO NOT DELETE CODE BELOW PANIC.
-  panic("You need to implement the code of populating a disk inode in lab4_1.\n" );
+  free_dinode->size = 0;
+  // 普通文件
+  free_dinode->type = R_FILE;
+  // 父目录的一个引用
+  free_dinode->nlinks = 1;
+  // 后续立马分配一个磁盘块
+  free_dinode->blocks = 1;
 
   // DO NOT REMOVE ANY CODE BELOW.
   // allocate a free block for the file
