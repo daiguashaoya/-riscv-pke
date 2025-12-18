@@ -45,9 +45,12 @@ extern struct dentry *vfs_root_dentry;
 // vfs abstract dentry
 struct dentry {
   char name[MAX_DENTRY_NAME_LEN];
+  // 引用计数
   int d_ref;
+  // i节点
   struct vinode *dentry_inode;
   struct dentry *parent;
+  //属于哪一个文件目录
   struct super_block *sb;
 };
 

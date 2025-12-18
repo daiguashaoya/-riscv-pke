@@ -101,6 +101,63 @@ int do_open(char *pathname, int flags) {
 }
 
 //
+// read current working directory
+//
+int do_rcwd(char *path) {
+  struct dentry *d = current->pfiles->cwd;
+  char buf[MAX_PATH_LEN];
+  int pos = MAX_PATH_LEN - 1;
+  buf[pos] = '\0';
+
+  if (d == vfs_root_dentry) {
+      strcpy(path, "/");
+      return 0;
+  }
+
+  while (d != vfs_root_dentry && d != NULL) {
+      int len = strlen(d->name);
+      pos -= len;
+      if (pos < 0) return -1; // Path too long
+      memcpy(buf + pos, d->name, len);
+      
+      pos--;
+      if (pos < 0) return -1;
+      buf[pos] = '/';
+      
+      d = d->parent;
+  }
+  strcpy(path, buf + pos);
+  return 0;
+}
+
+//
+// change current working directory
+//
+int do_ccwd(char *path) {
+  struct file *dir_file = vfs_opendir(path);
+  if (dir_file == NULL) {
+    sprint("do_ccwd: cannot open directory %s\n", path);
+    return -1;
+  }
+  
+  struct dentry *old_cwd = current->pfiles->cwd;
+  struct dentry *new_cwd = dir_file->f_dentry;
+  
+  new_cwd->d_ref++; // Ref for cwd
+  current->pfiles->cwd = new_cwd;
+  
+  vfs_closedir(dir_file); // Ref for file handle gone
+  
+  if (old_cwd != vfs_root_dentry) {
+      struct file fake;
+      fake.f_dentry = old_cwd;
+      vfs_closedir(&fake);
+  }
+  
+  return 0;
+}
+
+//
 // read content of a file ("fd") into "buf" for "count".
 // return: actual length of data read from the file.
 //
