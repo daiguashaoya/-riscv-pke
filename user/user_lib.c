@@ -26,6 +26,10 @@ uint64 do_user_call(uint64 sysnum, uint64 a1, uint64 a2, uint64 a3, uint64 a4, u
   return ret;
 }
 
+int wait(int pid) {
+  return do_user_call(SYS_user_wait, pid, 0, 0, 0, 0, 0, 0);
+}
+
 //
 // printu() supports user/lab1_1_helloworld.c
 //

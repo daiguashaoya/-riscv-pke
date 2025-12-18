@@ -16,6 +16,7 @@
 
 #include "spike_interface/spike_utils.h"
 
+extern process procs[NPROC];
 //
 // implement the SYS_user_print syscall
 //
@@ -31,10 +32,41 @@ ssize_t sys_user_print(const char* buf, size_t n) {
 //
 // implement the SYS_user_exit syscall
 //
-ssize_t sys_user_exit(uint64 code) {
+extern void insert_to_ready_queue(process *proc); // 确保有此声明
+
+ssize_t sys_user_exit(uint64 code)
+{
   sprint("User exit with code:%d.\n", code);
-  // reclaim the current process, and reschedule. added @lab3_1
-  free_process( current );
+
+  // 1. 将自身设为 ZOMBIE
+  current->status = ZOMBIE;
+
+  // 2. 检查父进程是否在等待自己
+  if (current->parent && current->parent->status == BLOCKED)
+  {
+    int64 wait_pid = current->parent->waiting_pid;
+
+    // 如果父进程在等我 (wait_pid == current->pid)
+    // 或者父进程在等任意子进程 (wait_pid == -1)
+    if (wait_pid == -1 || wait_pid == current->pid)
+    {
+
+      // A. 修改父进程状态为 READY
+      current->parent->status = READY;
+
+      // B. 将父进程的 a0 寄存器设置为子进程的 PID (作为 wait 的返回值)
+      current->parent->trapframe->regs.a0 = current->pid;
+
+      // [关键修复] C. 将父进程加入就绪队列！
+      // 缺少这一步会导致 schedule() 找不到父进程，从而报 "ready queue empty" 错误
+      insert_to_ready_queue(current->parent);
+
+      // D. 将自己设为 FREE (资源回收)
+      current->status = FREE;
+    }
+  }
+
+  // 3. 转调度
   schedule();
   return 0;
 }
@@ -80,19 +112,68 @@ ssize_t sys_user_fork() {
   sprint("User call fork.\n");
   return do_fork( current );
 }
-
 //
 // kerenl entry point of yield. added @lab3_2
 //
-ssize_t sys_user_yield() {
+ssize_t sys_user_yield()
+{
   // TODO (lab3_2): implment the syscall of yield.
   // hint: the functionality of yield is to give up the processor. therefore,
   // we should set the status of currently running process to READY, insert it in
   // the rear of ready queue, and finally, schedule a READY process to run.
-  current->status=READY;
+  // 1. 将当前进程状态设置为 READY (就绪态)
+  current->status = READY;
+
+  // 2. 将当前进程加入就绪队列的队尾
+  // insert_to_ready_queue 定义在 kernel/sched.c 中
   insert_to_ready_queue(current);
+
+  // 3. 转进程调度，选择下一个进程运行
+  // schedule 定义在 kernel/sched.c 中
   schedule();
+
   return 0;
+}
+
+ssize_t sys_user_wait(ssize_t pid)
+{
+  // 遍历所有进程，寻找属于当前进程的子进程
+  int has_child = 0;
+
+  for (int i = 0; i < NPROC; i++)
+  {
+    // 筛选条件: 是当前进程的子进程
+    if (procs[i].parent == current)
+    {
+
+      // 筛选 PID: pid==-1 (任意) 或 pid匹配
+      if (pid == -1 || procs[i].pid == pid)
+      {
+        has_child = 1;
+
+        // 情况 1: 发现僵尸子进程 (已退出)
+        if (procs[i].status == ZOMBIE)
+        {
+          // 回收资源
+          procs[i].status = FREE;
+          return procs[i].pid;
+        }
+      }
+    }
+  }
+
+  // 情况 2: 还有符合条件的子进程在运行，父进程进入阻塞状态
+  if (has_child)
+  {
+    current->status = BLOCKED;  // 设为阻塞
+    current->waiting_pid = pid; // 记录在等谁
+    schedule();                 // 让出 CPU
+    // 注意：当被唤醒时，返回值由唤醒者(子进程exit)直接写入 trapframe->a0
+    return 0; // 这里的返回值实际上会被覆盖
+  }
+
+  // 情况 3: 没有找到任何符合条件的子进程
+  return -1;
 }
 
 //
@@ -114,6 +195,8 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, l
       return sys_user_fork();
     case SYS_user_yield:
       return sys_user_yield();
+    case SYS_user_wait:
+      return sys_user_wait(a1);
     default:
       panic("Unknown syscall %ld \n", a0);
   }

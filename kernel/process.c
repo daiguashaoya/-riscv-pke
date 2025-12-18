@@ -184,46 +184,43 @@ int do_fork( process* parent)
     // browse parent's vm space, and copy its trapframe and data segments,
     // map its code segment.
     switch( parent->mapped_info[i].seg_type ){
-      // 复制中断帧
       case CONTEXT_SEGMENT:
         *child->trapframe = *parent->trapframe;
         break;
-      // 复制用户栈内容
       case STACK_SEGMENT:
         memcpy( (void*)lookup_pa(child->pagetable, child->mapped_info[STACK_SEGMENT].va),
           (void*)lookup_pa(parent->pagetable, parent->mapped_info[i].va), PGSIZE );
         break;
-      // 复制用了的堆页
-      // case HEAP_SEGMENT:
-      //   // build a same heap for child process.
+      case HEAP_SEGMENT:{
+        // build a same heap for child process.
 
-      //   // convert free_pages_address into a filter to skip reclaimed blocks in the heap
-      //   // when mapping the heap blocks
-      //   int free_block_filter[MAX_HEAP_PAGES];
-      //   memset(free_block_filter, 0, MAX_HEAP_PAGES);
-      //   uint64 heap_bottom = parent->user_heap.heap_bottom;
-      //   for (int i = 0; i < parent->user_heap.free_pages_count; i++) {
-      //     int index = (parent->user_heap.free_pages_address[i] - heap_bottom) / PGSIZE;
-      //     free_block_filter[index] = 1;
-      //   }
+        // convert free_pages_address into a filter to skip reclaimed blocks in the heap
+        // when mapping the heap blocks
+        int free_block_filter[MAX_HEAP_PAGES];
+        memset(free_block_filter, 0, MAX_HEAP_PAGES);
+        uint64 heap_bottom = parent->user_heap.heap_bottom;
+        for (int i = 0; i < parent->user_heap.free_pages_count; i++) {
+          int index = (parent->user_heap.free_pages_address[i] - heap_bottom) / PGSIZE;
+          free_block_filter[index] = 1;
+        }
 
-      //   // copy and map the heap blocks
-      //   for (uint64 heap_block = current->user_heap.heap_bottom;
-      //        heap_block < current->user_heap.heap_top; heap_block += PGSIZE) {
-      //     if (free_block_filter[(heap_block - heap_bottom) / PGSIZE])  // skip free blocks
-      //       continue;
+        // copy and map the heap blocks
+        for (uint64 heap_block = current->user_heap.heap_bottom;
+             heap_block < current->user_heap.heap_top; heap_block += PGSIZE) {
+          if (free_block_filter[(heap_block - heap_bottom) / PGSIZE])  // skip free blocks
+            continue;
 
-      //     void* child_pa = alloc_page();
-      //     memcpy(child_pa, (void*)lookup_pa(parent->pagetable, heap_block), PGSIZE);
-      //     user_vm_map((pagetable_t)child->pagetable, heap_block, PGSIZE, (uint64)child_pa,
-      //                 prot_to_type(PROT_WRITE | PROT_READ, 1));
-      //   }
+          void* child_pa = alloc_page();
+          memcpy(child_pa, (void*)lookup_pa(parent->pagetable, heap_block), PGSIZE);
+          user_vm_map((pagetable_t)child->pagetable, heap_block, PGSIZE, (uint64)child_pa,
+                      prot_to_type(PROT_WRITE | PROT_READ, 1));
+        }
 
-      //   child->mapped_info[HEAP_SEGMENT].npages = parent->mapped_info[HEAP_SEGMENT].npages;
+        child->mapped_info[HEAP_SEGMENT].npages = parent->mapped_info[HEAP_SEGMENT].npages;
 
-      //   // copy the heap manager from parent to child
-      //   memcpy((void*)&child->user_heap, (void*)&parent->user_heap, sizeof(parent->user_heap));
-      //   break;
+        // copy the heap manager from parent to child
+        memcpy((void*)&child->user_heap, (void*)&parent->user_heap, sizeof(parent->user_heap));
+        break;}
       case CODE_SEGMENT:
         // TODO (lab3_1): implment the mapping of child code segment to parent's
         // code segment.
@@ -234,16 +231,25 @@ int do_fork( process* parent)
         // address region of child to the physical pages that actually store the code
         // segment of parent process.
         // DO NOT COPY THE PHYSICAL PAGES, JUST MAP THEM.
-        //遍历这个段的每一个页
-        map_pages(
-          child->pagetable,
-          parent->mapped_info[i].va,
-          parent->mapped_info[i].npages*PGSIZE,
-          lookup_pa(parent->pagetable,
-          parent->mapped_info[i].va),
-          prot_to_type(
-            PROT_EXEC|PROT_READ,1
-        ));
+        // --- 开始修改部分 ---
+
+        // 1. 遍历父进程代码段的每一页
+        for (int j = 0; j < parent->mapped_info[i].npages; j++)
+        {
+          // 计算当前页的虚拟地址
+          uint64 addr = parent->mapped_info[i].va + j * PGSIZE;
+
+          // 2. 查找父进程该虚拟地址对应的物理地址 (PA)
+          // lookup_pa 定义在 kernel/vmm.c 中
+          uint64 pa = lookup_pa(parent->pagetable, addr);
+
+          // 3. 将该物理地址映射到子进程的页表中
+          // 权限设置为：可读 | 可执行，且为用户页面 (最后一个参数为 1)
+          user_vm_map(child->pagetable, addr, PGSIZE, pa,
+                      prot_to_type(PROT_READ | PROT_EXEC, 1));
+        }
+
+        // --- 修改结束 ---
 
         // after mapping, register the vm region (do not delete codes below!)
         child->mapped_info[child->total_mapped_region].va = parent->mapped_info[i].va;
@@ -252,7 +258,32 @@ int do_fork( process* parent)
         child->mapped_info[child->total_mapped_region].seg_type = CODE_SEGMENT;
         child->total_mapped_region++;
         break;
-    }
+      case DATA_SEGMENT:{
+        // 遍历数据段的每一页
+        for (int j = 0; j < parent->mapped_info[i].npages; j++)
+        {
+          uint64 addr = parent->mapped_info[i].va + j * PGSIZE;
+
+          // 1. 为子进程分配新的物理页
+          char *page = alloc_page();
+
+          // 2. 将父进程该页的数据深拷贝到新页中
+          // lookup_pa 获取父进程该虚拟地址对应的物理地址
+          memcpy(page, (void *)lookup_pa(parent->pagetable, addr), PGSIZE);
+
+          // 3. 将新页映射到子进程的页表
+          // 权限: 可读 | 可写 (PROT_READ | PROT_WRITE), 用户态 (1)
+          user_vm_map(child->pagetable, addr, PGSIZE, (uint64)page,
+                      prot_to_type(PROT_WRITE | PROT_READ, 1));
+        }
+
+        // 注册映射信息
+        child->mapped_info[child->total_mapped_region].va = parent->mapped_info[i].va;
+        child->mapped_info[child->total_mapped_region].npages = parent->mapped_info[i].npages;
+        child->mapped_info[child->total_mapped_region].seg_type = DATA_SEGMENT;
+        child->total_mapped_region++;
+        break;}
+      }
   }
 
   child->status = READY;
