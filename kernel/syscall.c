@@ -85,12 +85,22 @@ ssize_t sys_user_fork() {
 //
 // kerenl entry point of yield. added @lab3_2
 //
-ssize_t sys_user_yield() {
+ssize_t sys_user_yield()
+{
   // TODO (lab3_2): implment the syscall of yield.
   // hint: the functionality of yield is to give up the processor. therefore,
   // we should set the status of currently running process to READY, insert it in
   // the rear of ready queue, and finally, schedule a READY process to run.
-  panic( "You need to implement the yield syscall in lab3_2.\n" );
+  // 1. 将当前进程状态设置为 READY (就绪态)
+  current->status = READY;
+
+  // 2. 将当前进程加入就绪队列的队尾
+  // insert_to_ready_queue 定义在 kernel/sched.c 中
+  insert_to_ready_queue(current);
+
+  // 3. 转进程调度，选择下一个进程运行
+  // schedule 定义在 kernel/sched.c 中
+  schedule();
 
   return 0;
 }
@@ -214,6 +224,22 @@ ssize_t sys_user_unlink(char * vfn){
 }
 
 //
+// lib call to read cwd
+//
+ssize_t sys_user_rcwd(char *pathva){
+  char *pathpa = (char*)user_va_to_pa((pagetable_t)(current->pagetable), (void*)pathva);
+  return do_rcwd(pathpa);
+}
+
+//
+// lib call to change cwd
+//
+ssize_t sys_user_ccwd(char *pathva){
+  char *pathpa = (char*)user_va_to_pa((pagetable_t)(current->pagetable), (void*)pathva);
+  return do_ccwd(pathpa);
+}
+
+//
 // [a0]: the syscall number; [a1] ... [a7]: arguments to the syscalls.
 // returns the code of success, (e.g., 0 means success, fail for otherwise)
 //
@@ -261,6 +287,11 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, l
       return sys_user_link((char *)a1, (char *)a2);
     case SYS_user_unlink:
       return sys_user_unlink((char *)a1);
+    // added @lab4_challenge1
+    case SYS_user_rcwd:
+      return sys_user_rcwd((char *)a1);
+    case SYS_user_ccwd:
+      return sys_user_ccwd((char *)a1);
     default:
       panic("Unknown syscall %ld \n", a0);
   }
