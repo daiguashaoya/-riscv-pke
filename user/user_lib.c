@@ -26,6 +26,10 @@ int do_user_call(uint64 sysnum, uint64 a1, uint64 a2, uint64 a3, uint64 a4, uint
   return ret;
 }
 
+int print_backtrace(int depth)
+{
+  return do_user_call(SYS_user_backtrace, depth, 0, 0, 0, 0, 0, 0); 
+}
 //
 // printu() supports user/lab1_1_helloworld.c
 //

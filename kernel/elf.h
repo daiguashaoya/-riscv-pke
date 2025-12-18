@@ -25,6 +25,30 @@ typedef struct elf_header_t {
   uint16 shstrndx;  /* Section header string table index */
 } elf_header;
 
+// Section header
+typedef struct elf_sect_header_t {
+  uint32 name;
+  uint32 type;
+  uint64 flags;
+  uint64 addr;
+  uint64 offset;
+  uint64 size;
+  uint32 link;
+  uint32 info;
+  uint64 addralign;
+  uint64 entsize;
+} elf_sect_header;
+
+// Symbol table entry
+typedef struct elf_sym_t {
+  uint32 name;
+  unsigned char info;
+  unsigned char other;
+  uint16 shndx;
+  uint64 value;
+  uint64 size;
+} elf_sym;
+
 // Program segment header.
 typedef struct elf_prog_header_t {
   uint32 type;   /* Segment type */

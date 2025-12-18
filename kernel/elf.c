@@ -132,7 +132,7 @@ void load_bincode_from_host_elf(process *p) {
 
   // entry (virtual, also physical in lab1_x) address
   p->trapframe->epc = elfloader.ehdr.entry;
-
+  strcpy(p->app_name, arg_bug_msg.argv[0]);
   // close the host spike file
   spike_file_close( info.f );
 
