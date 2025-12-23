@@ -67,8 +67,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
       uint64 va = stval - (stval % PGSIZE);
       user_vm_map((pagetable_t)current->pagetable, va, PGSIZE, (uint64)pa,
                   prot_to_type(PROT_WRITE | PROT_READ, 1));
-    }
-    if (stval < current->heap_top && stval >= USER_FREE_ADDRESS_START) {
+    } else if (stval < current->heap_top && stval >= USER_FREE_ADDRESS_START) {
       // 合法情况,不应该报缺页异常的
       panic("Unknow page fault!");
     } else
