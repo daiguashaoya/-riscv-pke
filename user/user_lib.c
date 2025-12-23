@@ -10,6 +10,7 @@
 #include "util/snprintf.h"
 #include "kernel/syscall.h"
 
+// 第一个参数是系统调用号，后面七个参数是系统调用的参数
 int do_user_call(uint64 sysnum, uint64 a1, uint64 a2, uint64 a3, uint64 a4, uint64 a5, uint64 a6,
                  uint64 a7) {
   int ret;
@@ -48,4 +49,8 @@ int printu(const char* s, ...) {
 //
 int exit(int code) {
   return do_user_call(SYS_user_exit, code, 0, 0, 0, 0, 0, 0); 
+}
+
+int print_backtrace(int depth) {
+  return do_user_call(SYS_user_print_backtrace, depth, 0, 0, 0, 0, 0, 0);
 }

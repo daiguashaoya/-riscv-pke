@@ -1,0 +1,28 @@
+[
+  {
+    "arguments": [
+      "/home/ltp/database/riscv64-elf-gcc/bin/riscv64-unknown-elf-gcc",
+      "-Wall",
+      "-Werror",
+      "-fno-builtin",
+      "-D__NO_INLINE__",
+      "-mcmodel=medany",
+      "-g",
+      "-Og",
+      "-std=gnu99",
+      "-Wno-unused",
+      "-Wno-attributes",
+      "-fno-delete-null-pointer-checks",
+      "-fno-PIE",
+      "-fno-omit-frame-pointer",
+      "-I.",
+      "-c",
+      "-o",
+      "obj/kernel/strap.o",
+      "kernel/strap.c"
+    ],
+    "directory": "/home/ltp/database/riscv-pke",
+    "file": "/home/ltp/database/riscv-pke/kernel/strap.c",
+    "output": "/home/ltp/database/riscv-pke/obj/kernel/strap.o"
+  }
+]

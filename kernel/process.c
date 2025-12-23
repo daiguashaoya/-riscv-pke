@@ -34,13 +34,15 @@ void switch_to(process* proc) {
   // will be triggered when an interrupt occurs in S mode.
   write_csr(stvec, (uint64)smode_trap_vector);
 
-  // set up trapframe values (in process structure) that smode_trap_vector will need when
-  // the process next re-enters the kernel.
+  // set up trapframe values (in process structure) that smode_trap_vector will
+  // need when the process next re-enters the kernel. 39-40行：设置
+  // trapframe，为下次 trap 做准备
   proc->trapframe->kernel_sp = proc->kstack;  // process's kernel stack
   proc->trapframe->kernel_trap = (uint64)smode_trap_handler;
 
   // SSTATUS_SPP and SSTATUS_SPIE are defined in kernel/riscv.h
   // set S Previous Privilege mode (the SSTATUS_SPP bit in sstatus register) to User mode.
+  // 回到用户态，并允许中断
   unsigned long x = read_csr(sstatus);
   x &= ~SSTATUS_SPP;  // clear SPP to 0 for user mode
   x |= SSTATUS_SPIE;  // enable interrupts in user mode

@@ -8,8 +8,10 @@ typedef struct trapframe_t {
   /* offset:0   */ riscv_regs regs;
 
   // process's "user kernel" stack
+  // 内核栈顶地址
   /* offset:248 */ uint64 kernel_sp;
   // pointer to smode_trap_handler
+  // 指向内核陷阱处理函数的指针smode_handler
   /* offset:256 */ uint64 kernel_trap;
   // saved user process counter
   /* offset:264 */ uint64 epc;

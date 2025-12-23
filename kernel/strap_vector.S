@@ -15,6 +15,7 @@ trap_sec_start:
 #
 .globl smode_trap_vector
 .align 4
+# 保存用户态的现场
 smode_trap_vector:
     # swap a0 and sscratch, so that points a0 to the trapframe of current process
     csrrw a0, sscratch, a0
@@ -47,6 +48,7 @@ smode_trap_vector:
 # trapframe (defined in kernel/process.h) of the process.
 #
 .globl return_to_user
+# 保存内核态的现场
 return_to_user:
     # [sscratch]=[a0], save a0 in sscratch, so sscratch points to a trapframe now.
     csrw sscratch, a0

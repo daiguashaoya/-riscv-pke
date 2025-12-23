@@ -17,11 +17,14 @@ process user_app;
 // load_bincode_from_host_elf is defined in elf.c
 //
 void load_user_program(process *proc) {
-  // USER_TRAP_FRAME is a physical address defined in kernel/config.h
+  // USER_TRAP_FRAME is a physical address defined in kernel/config.h 
+  // 现场快照保存地址
   proc->trapframe = (trapframe *)USER_TRAP_FRAME;
   memset(proc->trapframe, 0, sizeof(trapframe));
   // USER_KSTACK is also a physical address defined in kernel/config.h
+  // 内核栈地址
   proc->kstack = USER_KSTACK;
+  //用户栈栈顶地址
   proc->trapframe->regs.sp = USER_STACK;
 
   // load_bincode_from_host_elf() is defined in kernel/elf.c

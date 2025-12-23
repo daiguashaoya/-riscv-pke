@@ -1,12 +1,18 @@
 /*
- * routines that scan and load a (host) Executable and Linkable Format (ELF) file
- * into the (emulated) memory.
+ * routines that scan and load a (host) Executable and Linkable Format (ELF)
+ * file into the (emulated) memory.
  */
 
 #include "elf.h"
-#include "string.h"
 #include "riscv.h"
 #include "spike_interface/spike_utils.h"
+#include "string.h"
+
+elf_section_header shstrtab_header;
+uint64 symtab_off = 0, symtab_sz = 0;
+uint64 strtab_off = 0, strtab_sz = 0;
+
+elf_ctx elfloader;
 
 typedef struct elf_info_t {
   spike_file_t *f;
@@ -14,9 +20,11 @@ typedef struct elf_info_t {
 } elf_info;
 
 //
-// the implementation of allocater. allocates memory space for later segment loading
+// the implementation of allocater. allocates memory space for later segment
+// loading
 //
-static void *elf_alloc_mb(elf_ctx *ctx, uint64 elf_pa, uint64 elf_va, uint64 size) {
+static void *elf_alloc_mb(elf_ctx *ctx, uint64 elf_pa, uint64 elf_va,
+                          uint64 size) {
   // directly returns the virtual address as we are in the Bare mode in lab1_x
   return (void *)elf_va;
 }
@@ -27,8 +35,8 @@ static void *elf_alloc_mb(elf_ctx *ctx, uint64 elf_pa, uint64 elf_va, uint64 siz
 static uint64 elf_fpread(elf_ctx *ctx, void *dest, uint64 nb, uint64 offset) {
   elf_info *msg = (elf_info *)ctx->info;
   // call spike file utility to load the content of elf file into memory.
-  // spike_file_pread will read the elf file (msg->f) from offset to memory (indicated by
-  // *dest) for nb bytes.
+  // spike_file_pread will read the elf file (msg->f) from offset to memory
+  // (indicated by *dest) for nb bytes.
   return spike_file_pread(msg->f, dest, nb, offset);
 }
 
@@ -39,12 +47,38 @@ elf_status elf_init(elf_ctx *ctx, void *info) {
   ctx->info = info;
 
   // load the elf header
-  if (elf_fpread(ctx, &ctx->ehdr, sizeof(ctx->ehdr), 0) != sizeof(ctx->ehdr)) return EL_EIO;
+  if (elf_fpread(ctx, &ctx->ehdr, sizeof(ctx->ehdr), 0) != sizeof(ctx->ehdr))
+    return EL_EIO;
 
   // check the signature (magic value) of the elf
-  if (ctx->ehdr.magic != ELF_MAGIC) return EL_NOTELF;
+  if (ctx->ehdr.magic != ELF_MAGIC)
+    return EL_NOTELF;
 
   return EL_OK;
+}
+
+char *find_symbol_name_by_addr(uint64 addr) {
+  elf_symbol sym;
+  // 计算有多少个符号
+  int num_symbols = symtab_sz / sizeof(elf_symbol);
+
+  for (int i = 0; i < num_symbols; i++) {
+    // 1. 读取第 i 个符号
+    // 偏移量 = 符号表起点 + i * 单个符号大小
+    uint64 current_sym_offset = symtab_off + i * sizeof(elf_symbol);
+    elf_fpread(&elfloader, &sym, sizeof(sym), current_sym_offset);
+    // 2. 核心判断：地址匹配
+    // 如果 ra 落在 [sym.value, sym.value + sym.size) 区间
+    if (addr >= sym.value && addr < (sym.value + sym.size)) {
+      // 3. 找到了！去 .strtab 读名字
+      // 名字位置 = 字符串表起点 + 符号中的 name 偏移
+      static char func_name_buf[64]; // 静态buffer返回（或者你可以malloc）
+      elf_fpread(&elfloader, func_name_buf, 64, strtab_off + sym.name);
+
+      return func_name_buf;
+    }
+  }
+  return "unknown";
 }
 
 //
@@ -56,13 +90,19 @@ elf_status elf_load(elf_ctx *ctx) {
   int i, off;
 
   // traverse the elf program segment headers
-  for (i = 0, off = ctx->ehdr.phoff; i < ctx->ehdr.phnum; i++, off += sizeof(ph_addr)) {
+  for (i = 0, off = ctx->ehdr.phoff; i < ctx->ehdr.phnum;
+       i++, off += sizeof(ph_addr)) {
     // read segment headers
-    if (elf_fpread(ctx, (void *)&ph_addr, sizeof(ph_addr), off) != sizeof(ph_addr)) return EL_EIO;
+    if (elf_fpread(ctx, (void *)&ph_addr, sizeof(ph_addr), off) !=
+        sizeof(ph_addr))
+      return EL_EIO;
 
-    if (ph_addr.type != ELF_PROG_LOAD) continue;
-    if (ph_addr.memsz < ph_addr.filesz) return EL_ERR;
-    if (ph_addr.vaddr + ph_addr.memsz < ph_addr.vaddr) return EL_ERR;
+    if (ph_addr.type != ELF_PROG_LOAD)
+      continue;
+    if (ph_addr.memsz < ph_addr.filesz)
+      return EL_ERR;
+    if (ph_addr.vaddr + ph_addr.memsz < ph_addr.vaddr)
+      return EL_ERR;
 
     // allocate memory block before elf loading
     void *dest = elf_alloc_mb(ctx, ph_addr.vaddr, ph_addr.vaddr, ph_addr.memsz);
@@ -81,23 +121,25 @@ typedef union {
 } arg_buf;
 
 //
-// returns the number (should be 1) of string(s) after PKE kernel in command line.
-// and store the string(s) in arg_bug_msg.
+// returns the number (should be 1) of string(s) after PKE kernel in command
+// line. and store the string(s) in arg_bug_msg.
 //
 static size_t parse_args(arg_buf *arg_bug_msg) {
-  // HTIFSYS_getmainvars frontend call reads command arguments to (input) *arg_bug_msg
+  // HTIFSYS_getmainvars frontend call reads command arguments to (input)
+  // *arg_bug_msg
   long r = frontend_syscall(HTIFSYS_getmainvars, (uint64)arg_bug_msg,
-      sizeof(*arg_bug_msg), 0, 0, 0, 0, 0);
+                            sizeof(*arg_bug_msg), 0, 0, 0, 0, 0);
   kassert(r == 0);
 
   size_t pk_argc = arg_bug_msg->buf[0];
   uint64 *pk_argv = &arg_bug_msg->buf[1];
 
-  int arg = 1;  // skip the PKE OS kernel string, leave behind only the application name
+  int arg = 1; // skip the PKE OS kernel string, leave behind only the
+               // application name
   for (size_t i = 0; arg + i < pk_argc; i++)
     arg_bug_msg->argv[i] = (char *)(uintptr_t)pk_argv[arg + i];
 
-  //returns the number of strings after PKE kernel in command line
+  // returns the number of strings after PKE kernel in command line
   return pk_argc - arg;
 }
 
@@ -109,32 +151,68 @@ void load_bincode_from_host_elf(process *p) {
 
   // retrieve command line arguements
   size_t argc = parse_args(&arg_bug_msg);
-  if (!argc) panic("You need to specify the application program!\n");
+  if (!argc)
+    panic("You need to specify the application program!\n");
 
   sprint("Application: %s\n", arg_bug_msg.argv[0]);
 
-  //elf loading. elf_ctx is defined in kernel/elf.h, used to track the loading process.
-  elf_ctx elfloader;
-  // elf_info is defined above, used to tie the elf file and its corresponding process.
+  // elf loading. elf_ctx is defined in kernel/elf.h, used to track the loading
+  // process.
+
+  // elf_info is defined above, used to tie the elf file and its corresponding
+  // process.
   elf_info info;
 
   info.f = spike_file_open(arg_bug_msg.argv[0], O_RDONLY, 0);
   info.p = p;
   // IS_ERR_VALUE is a macro defined in spike_interface/spike_htif.h
-  if (IS_ERR_VALUE(info.f)) panic("Fail on openning the input application program.\n");
+  if (IS_ERR_VALUE(info.f))
+    panic("Fail on openning the input application program.\n");
 
   // init elfloader context. elf_init() is defined above.
   if (elf_init(&elfloader, &info) != EL_OK)
     panic("fail to init elfloader.\n");
 
   // load elf. elf_load() is defined above.
-  if (elf_load(&elfloader) != EL_OK) panic("Fail on loading elf.\n");
+  if (elf_load(&elfloader) != EL_OK)
+    panic("Fail on loading elf.\n");
 
   // entry (virtual, also physical in lab1_x) address
   p->trapframe->epc = elfloader.ehdr.entry;
 
-  // close the host spike file
-  spike_file_close( info.f );
+  // 找到shstrtab_header
+  uint64 shstrtab_header_offset =
+      elfloader.ehdr.shoff + elfloader.ehdr.shstrndx * elfloader.ehdr.shentsize;
+  elf_fpread(&elfloader, &shstrtab_header, sizeof(shstrtab_header),
+             shstrtab_header_offset);
+  uint64 shstrtab_file_off = shstrtab_header.offset;
 
-  sprint("Application program entry point (virtual address): 0x%lx\n", p->trapframe->epc);
+  elf_section_header sh;
+  char name_buf[32]; // 用来存读取到的 Section 名字
+
+  // 确定symtab和strtab的文件偏移
+  for (int i = 0; i < elfloader.ehdr.shnum; i++) {
+    // 1. 读取第 i 个 Section Header
+    uint64 sh_offset = elfloader.ehdr.shoff + i * sizeof(elf_section_header);
+    elf_fpread(&elfloader, &sh, sizeof(sh), sh_offset);
+
+    // 2. 读取这个 Section 的名字
+    // 名字位于：Section名字字符串表基址 + 当前Section的name偏移
+    elf_fpread(&elfloader, name_buf, 32, shstrtab_file_off + sh.name);
+
+    // 3. 比对名字
+    if (strcmp(name_buf, ".symtab") == 0) {
+      symtab_off = sh.offset; // 找到了符号表的文件偏移
+      symtab_sz = sh.size;    // 找到了符号表的大小
+    } else if (strcmp(name_buf, ".strtab") == 0) {
+      strtab_off = sh.offset; // 找到了字符串表的文件偏移
+      strtab_sz = sh.size;
+    }
+  }
+
+  // close the host spike file
+  spike_file_close(info.f);
+
+  sprint("Application program entry point (virtual address): 0x%lx\n",
+         p->trapframe->epc);
 }
