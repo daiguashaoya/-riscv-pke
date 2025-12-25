@@ -1,0 +1,27 @@
+[
+  {
+    "arguments": [
+      "/home/ltp/database/riscv64-elf-gcc/bin/riscv64-unknown-elf-gcc",
+      "-Wall",
+      "-Werror",
+      "-fno-builtin",
+      "-D__NO_INLINE__",
+      "-mcmodel=medany",
+      "-g",
+      "-Og",
+      "-std=gnu99",
+      "-Wno-unused",
+      "-Wno-attributes",
+      "-fno-delete-null-pointer-checks",
+      "-fno-PIE",
+      "-I.",
+      "-c",
+      "-o",
+      "obj/util/snprintf.o",
+      "util/snprintf.c"
+    ],
+    "directory": "/home/ltp/database/riscv-pke",
+    "file": "/home/ltp/database/riscv-pke/util/snprintf.c",
+    "output": "/home/ltp/database/riscv-pke/obj/util/snprintf.o"
+  }
+]

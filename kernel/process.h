@@ -16,7 +16,7 @@ typedef struct trapframe_t {
 
   // kernel page table. added @lab2_1
   /* offset:272 */ uint64 kernel_satp;
-}trapframe;
+} trapframe;
 
 // riscv-pke kernel supports at most 32 processes
 #define NPROC 32
@@ -25,21 +25,26 @@ typedef struct trapframe_t {
 
 // possible status of a process
 enum proc_status {
-  FREE,            // unused state
-  READY,           // ready state
-  RUNNING,         // currently running
-  BLOCKED,         // waiting for something
-  ZOMBIE,          // terminated but not reclaimed yet
+  FREE,    // unused state
+  READY,   // ready state
+  RUNNING, // currently running
+  BLOCKED, // waiting for something
+  ZOMBIE,  // terminated but not reclaimed yet
 };
 
 // types of a segment
 enum segment_type {
-  STACK_SEGMENT = 0,   // runtime stack segment
+  // 栈段
+  STACK_SEGMENT = 0, // runtime stack segment
+  // 上下文
   CONTEXT_SEGMENT, // trapframe segment
   SYSTEM_SEGMENT,  // system segment
-  HEAP_SEGMENT,    // runtime heap segment
-  CODE_SEGMENT,    // ELF segment
-  DATA_SEGMENT,    // ELF segment
+  // 堆段
+  HEAP_SEGMENT, // runtime heap segment
+  // 代码段
+  CODE_SEGMENT, // ELF segment
+  // 数据段(全局变量、静态变量)
+  DATA_SEGMENT, // ELF segment
 };
 
 // the VM regions mapped to a user process
@@ -59,7 +64,7 @@ typedef struct process_heap_manager {
   uint64 free_pages_address[MAX_HEAP_PAGES];
   // the number of free pages in the heap
   uint32 free_pages_count;
-}process_heap_manager;
+} process_heap_manager;
 
 // the extremely simple definition of process, used for begining labs of PKE
 typedef struct process_t {
@@ -68,8 +73,8 @@ typedef struct process_t {
   // user page table
   pagetable_t pagetable;
   // trapframe storing the context of a (User mode) process.
-  //中断帧指针 用于保护现场（例如pc、寄存器)
-  trapframe* trapframe;
+  // 中断帧指针 用于保护现场（例如pc、寄存器)
+  trapframe *trapframe;
 
   // points to a page that contains mapped_regions. below are added @lab3_1
   mapped_region *mapped_info;
@@ -91,21 +96,22 @@ typedef struct process_t {
 
   // accounting. added @lab3_3
   int tick_count;
-}process;
+} process;
 
 // switch to run user app
-void switch_to(process*);
+void switch_to(process *);
 
 // initialize process pool (the procs[] array)
 void init_proc_pool();
 // allocate an empty process, init its vm space. returns its pid
-process* alloc_process();
+process *alloc_process();
 // reclaim a process, destruct its vm space and free physical pages.
-int free_process( process* proc );
+int free_process(process *proc);
 // fork a child from parent
-int do_fork(process* parent);
+int do_fork(process *parent);
 
 // current running process
-extern process* current;
+extern process *current;
+extern process procs[NPROC];
 
 #endif
