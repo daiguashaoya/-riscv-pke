@@ -26,6 +26,9 @@ int do_unlink(char *path);
 
 void fs_init(void);
 
+int do_rcwd(char *path);
+int do_ccwd(const char *path);
+
 // data structure that manages all openned files in a PCB
 typedef struct proc_file_management_t {
   //当前工作目录指针
