@@ -69,6 +69,7 @@ typedef struct process_t {
   // user page table
   pagetable_t pagetable;
   // trapframe storing the context of a (User mode) process.
+  //中断帧指针 用于保护现场（例如pc、寄存器)
   trapframe* trapframe;
 
   // points to a page that contains mapped_regions. below are added @lab3_1
@@ -77,6 +78,7 @@ typedef struct process_t {
   int total_mapped_region;
 
   // heap management
+  // 用户堆管理
   process_heap_manager user_heap;
 
   // process id

@@ -28,6 +28,7 @@ void fs_init(void);
 
 // data structure that manages all openned files in a PCB
 typedef struct proc_file_management_t {
+  //当前工作目录指针
   struct dentry *cwd;  // vfs dentry of current working directory
   struct file opened_files[MAX_FILES];  // opened files array
   int nfiles;  // the number of files opened by a process
