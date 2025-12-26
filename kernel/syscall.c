@@ -41,10 +41,10 @@ ssize_t sys_user_print_backtrace(uint64 depth) {
   uint64 fp = current->trapframe->regs.s0;
   // 这个是print_backtrace函数的栈顶，注意这里是-8
   fp = *(uint64 *)(fp - 8);
-  for (int i = 0; i < depth && fp != 0; i++) {
+  for (int i = 0; i < depth && fp < 0x81100000; i++) {
     // 读取栈上的 Return Address (通常是 fp - 8)
     uint64 ra = *(uint64 *)(fp - 8);
-    // sprint("0x%lx\n", ra);
+    // sprint("0x%lx\n", fp);
     // 4. 在 ELF 符号表中查找 ra 对应的函数名
     char *func_name = find_symbol_name_by_addr(ra);
 
@@ -55,6 +55,7 @@ ssize_t sys_user_print_backtrace(uint64 depth) {
   }
   return 0;
 }
+
 long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
                 long a7) {
   switch (a0) {
