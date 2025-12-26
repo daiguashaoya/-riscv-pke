@@ -72,3 +72,27 @@ void schedule() {
   sprint( "going to schedule process %d to run.\n", current->pid );
   switch_to( current );
 }
+
+// 将进程加入等待队列尾部
+void insert_to_wait_queue(process **queue_head, process *proc) {
+  proc->queue_next = NULL;
+  if (*queue_head == NULL) {
+    *queue_head = proc;
+  } else {
+    process *p = *queue_head;
+    // 查找当前等待队列的队尾
+    while (p->queue_next != NULL)
+      p = p->queue_next;
+    p->queue_next = proc;
+  }
+}
+
+// 从等待队列头部取出进程
+process *pop_from_wait_queue(process **queue_head) {
+  if (*queue_head == NULL)
+    return NULL;
+  process *proc = *queue_head;
+  *queue_head = proc->queue_next;
+  proc->queue_next = NULL;
+  return proc;
+}

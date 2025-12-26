@@ -6,9 +6,9 @@
  */
 
 #include "user_lib.h"
-#include "util/types.h"
-#include "util/snprintf.h"
-#include "kernel/syscall.h"
+#include "../util/types.h"
+#include "../util/snprintf.h"
+#include "../kernel/syscall.h"
 
 uint64 do_user_call(uint64 sysnum, uint64 a1, uint64 a2, uint64 a3, uint64 a4, uint64 a5, uint64 a6,
                  uint64 a7) {
@@ -75,4 +75,16 @@ int fork() {
 //
 void yield() {
   do_user_call(SYS_user_yield, 0, 0, 0, 0, 0, 0, 0);
+}
+
+int sem_new(int value) {
+  return do_user_call(SYS_user_sem_new, value, 0, 0, 0, 0, 0, 0);
+}
+
+void sem_P(int sem_id) {
+  do_user_call(SYS_user_sem_P, sem_id, 0, 0, 0, 0, 0, 0);
+}
+
+void sem_V(int sem_id) {
+  do_user_call(SYS_user_sem_V, sem_id, 0, 0, 0, 0, 0, 0);
 }
