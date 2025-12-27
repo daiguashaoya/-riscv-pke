@@ -52,7 +52,6 @@ void load_user_program(process *proc) {
   // USER_STACK_TOP = 0x7ffff000, defined in kernel/memlayout.h
   proc->trapframe->regs.sp = USER_STACK_TOP;  //virtual address of user stack top
 
-  proc->heap_top = USER_FREE_ADDRESS_START;
   sprint("user frame 0x%lx, user stack 0x%lx, user kstack 0x%lx \n", proc->trapframe,
          proc->trapframe->regs.sp, proc->kstack);
 
