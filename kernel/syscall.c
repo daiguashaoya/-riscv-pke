@@ -107,43 +107,81 @@ ssize_t sys_user_yield() {
   return 0;
 }
 
-ssize_t sys_user_wait(int pid) {
-
-  while (1) {
-    // 步骤1: 验证pid参数
-    if (pid != -1 && pid <= 0) {
-      return -1; // 非法pid
+void reclaim_process(process *proc) {
+  // 1. 释放用户页表中映射的物理页（用户栈、数据段、堆等）
+  // 需要遍历 mapped_info，根据 seg_type 决定是否释放物理页
+  for (int i = 0; i < proc->total_mapped_region; i++) {
+    // 代码段是共享的，不要释放
+    if (proc->mapped_info[i].seg_type == CODE_SEGMENT ||
+        proc->mapped_info[i].seg_type == SYSTEM_SEGMENT ||
+        proc->mapped_info[i].seg_type == CONTEXT_SEGMENT){
+      continue;
     }
-    process *child = NULL;
-    // 遍历查找子进程
-    for (int i = 0; i < NPROC; i++) {
-      if (procs[i].parent == current) {
-        if (pid == -1 && procs[i].status == ZOMBIE) {
-          child = &procs[i];
-          break;
-        } else if (procs[i].pid == pid) {
-          child = &procs[i];
-          break;
-        }
+    // 释放其他段的物理页
+    for (int j = 0; j < proc->mapped_info[i].npages; j++) {
+      uint64 va = proc->mapped_info[i].va + j * PGSIZE;
+      uint64 pa = lookup_pa(proc->pagetable, va);
+      if (pa != 0) {
+        free_page((void *)pa);
       }
     }
-
-    // 没找到符合条件的子进程
-    if (child == NULL) {
-      return -1;
-    }
-
-    // 子进程已退出
-    if (child->status == ZOMBIE) {
-      int child_pid = child->pid;
-      child->status = FREE;
-      return child_pid;
-    }
-    // 子进程还在运行，阻塞等待
-    current->status = BLOCKED;
-    schedule();
-    // 被唤醒后，循环回去重新检查
   }
+
+  // 2. 释放页表本身
+  free_page((void *)proc->pagetable);
+
+  // 3. 释放 trapframe
+  free_page((void *)proc->trapframe);
+
+  // 4. 释放内核栈
+  free_page((void *)(proc->kstack - PGSIZE));
+
+  // 5. 释放 mapped_info
+  free_page((void *)proc->mapped_info);
+}
+
+ssize_t sys_user_wait(int pid) {
+  if (pid != -1 && pid <= 0) {
+    return -1; // 非法pid
+  }
+  process *child = NULL;
+  // 遍历查找子进程
+  for (int i = 0; i < NPROC; i++) {
+    if (procs[i].parent == current) {
+      if (pid == -1) {
+        child = &procs[i];
+        break;
+      } else if (procs[i].pid == pid) {
+        child = &procs[i];
+        break;
+      }
+    }
+  }
+
+  // 没找到符合条件的子进程
+  if (child == NULL) {
+    return -1;
+  }
+
+  // 子进程已退出
+  if (child->status == ZOMBIE) {
+    int child_pid = child->pid;
+    uint64 free_before = count_free_pages();
+    reclaim_process(child);
+
+    uint64 free_after = count_free_pages();
+    sprint("Reclaimed %d pages from process %d\n", free_after - free_before,
+           child_pid);
+
+    child->status = FREE;
+    return child_pid;
+  }
+  // 子进程还在运行，阻塞等待
+  current->trapframe->epc -= 4; // 让 epc 回退，这样返回时会重新执行 ecall
+  current->status = BLOCKED;
+  schedule();
+  // 被唤醒后，循环回去重新检查
+  return 0;
 }
 
 //
