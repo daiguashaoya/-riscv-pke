@@ -22,16 +22,6 @@ typedef struct node {
 // g_free_mem_list is the head of the list of free physical memory pages
 static list_node g_free_mem_list;
 
-uint64 count_free_pages() {
-  uint64 count = 0;
-  list_node *n = g_free_mem_list.next;
-  while (n) {
-    count++;
-    n = n->next;
-  }
-  return count;
-}
-
 //
 // actually creates the freepage list. each page occupies 4KB (PGSIZE), i.e., small page.
 // PGSIZE is defined in kernel/riscv.h, ROUNDUP is defined in util/functions.h.

@@ -114,12 +114,10 @@ void reclaim_process(process *proc) {
     // 代码段是共享的，不要释放
     if (proc->mapped_info[i].seg_type == CODE_SEGMENT ||
         proc->mapped_info[i].seg_type == SYSTEM_SEGMENT ||
-        proc->mapped_info[i].seg_type == CONTEXT_SEGMENT){
+        proc->mapped_info[i].seg_type == CONTEXT_SEGMENT) {
       continue;
     }
     // 释放其他段的物理页
-    sprint("Reclaiming %d pages from  %d\n", proc->mapped_info[i].npages,
-           proc->mapped_info[i].seg_type);
     for (int j = 0; j < proc->mapped_info[i].npages; j++) {
       uint64 va = proc->mapped_info[i].va + j * PGSIZE;
       uint64 pa = lookup_pa(proc->pagetable, va);
@@ -168,13 +166,7 @@ ssize_t sys_user_wait(int pid) {
   // 子进程已退出
   if (child->status == ZOMBIE) {
     int child_pid = child->pid;
-    uint64 free_before = count_free_pages();
     reclaim_process(child);
-
-    uint64 free_after = count_free_pages();
-    sprint("Reclaimed %d pages from process %d\n", free_after - free_before,
-           child_pid);
-
     child->status = FREE;
     return child_pid;
   }
