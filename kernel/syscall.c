@@ -118,6 +118,8 @@ void reclaim_process(process *proc) {
       continue;
     }
     // 释放其他段的物理页
+    sprint("Reclaiming %d pages from  %d\n", proc->mapped_info[i].npages,
+           proc->mapped_info[i].seg_type);
     for (int j = 0; j < proc->mapped_info[i].npages; j++) {
       uint64 va = proc->mapped_info[i].va + j * PGSIZE;
       uint64 pa = lookup_pa(proc->pagetable, va);
