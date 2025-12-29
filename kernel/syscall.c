@@ -5,15 +5,15 @@
 #include <errno.h>
 #include <stdint.h>
 
+#include "../util/types.h"
 #include "pmm.h"
 #include "process.h"
 #include "sched.h"
+#include "semaphore.h"
 #include "string.h"
 #include "syscall.h"
 #include "util/functions.h"
-#include "../util/types.h"
 #include "vmm.h"
-#include "semaphore.h"
 
 #include "spike_interface/spike_utils.h"
 
@@ -103,13 +103,9 @@ ssize_t sys_user_yield() {
 
 ssize_t sys_user_sem_new(int value) { return do_sem_new(value); }
 
-ssize_t sys_user_sem_P(int sem_id) {
-  return do_sem_P(sem_id);
-}
+ssize_t sys_user_sem_P(int sem_id) { return do_sem_P(sem_id); }
 
-ssize_t sys_user_sem_V(int sem_id) {
-  return do_sem_V(sem_id);
-}
+ssize_t sys_user_sem_V(int sem_id) { return do_sem_V(sem_id); }
 //
 // [a0]: the syscall number; [a1] ... [a7]: arguments to the syscalls.
 // returns the code of success, (e.g., 0 means success, fail for otherwise)

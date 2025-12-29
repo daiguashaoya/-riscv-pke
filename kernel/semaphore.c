@@ -1,4 +1,5 @@
 #include "semaphore.h"
+#include "../spike_interface/spike_utils.h"
 #include "sched.h"
 #include "util/types.h"
 
@@ -35,7 +36,14 @@ int do_sem_P(int sem_id) {
 int do_sem_V(int sem_id) {
   if (sem_id < 0 || sem_id >= MAX_SEMAPHORES || !semaphores[sem_id].used)
     return -1;
-
+  process *wait_process;
+  sprint("semaphore %d value: %d\n wait queue: ", sem_id,
+         semaphores[sem_id].value);
+  for (wait_process = semaphores[sem_id].wait_queue; wait_process != NULL;
+       wait_process = wait_process->queue_next) {
+    sprint("%d  ", wait_process->pid);
+  }
+  sprint("\n");
   semaphores[sem_id].value++;
   if (semaphores[sem_id].value <= 0) {
     // 唤醒等待队列中的一个进程
