@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
   cd("..");
   printu("change current directory to ..\n");
   pwd();
-  
+
   printu("read: ./hostfile.txt\n");
 
   fd = open("./hostfile.txt", O_RDONLY);
@@ -59,6 +59,19 @@ int main(int argc, char *argv[]) {
   read_u(fd, buf, MAXBUF);
   printu("read content: \n%s\n", buf);
 
+  close(fd);
+
+  printu("\n======== Test 4: Open file using .. in path  ========\n");
+
+  // 当前在 /RAMDISK0
+  cd("./RAMDISK0");
+  pwd(); // 应该显示 /RAMDISK0
+
+  // 使用 ../hostfile.txt 打开根目录下的文件
+  fd = open("../hostfile.txt", O_RDONLY);
+  printu("file descriptor fd: %d\n", fd);
+  read_u(fd, buf, MAXBUF);
+  printu("read content: \n%s\n", buf);
   close(fd);
 
   printu("\nAll tests passed!\n\n");

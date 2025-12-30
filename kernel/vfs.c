@@ -548,11 +548,20 @@ struct dentry *lookup_final_dentry(const char *path, struct dentry **parent,
   struct dentry *this = *parent;
 
   while (token != NULL) {
-    if (strcmp(token, ".") == 0 || strcmp(token, "..") == 0) {
+    if (strcmp(token, ".") == 0) {
+      token = strtok(NULL, "/");
+      continue;
+    }
+    if (strcmp(token, "..") == 0) {
+      // ".." 表示父目录，需要回退！
+      if (this->parent != NULL) {
+        this = this->parent; // ← 关键：回到父目录
+      }
       token = strtok(NULL, "/");
       continue;
     }
     *parent = this;
+
     this = hash_get_dentry((*parent), token); // try hash first
     if (this == NULL) {
       // if not found in hash, try to find it in the directory

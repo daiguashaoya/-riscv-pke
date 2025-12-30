@@ -271,10 +271,10 @@ int do_ccwd(const char *path) {
   if (path[0] == '/') {
     parent = vfs_root_dentry;
   }
-  // 如果是../格式，从当前目录的父目录开始
-  if (path[0] == '.' && path[1] == '.') {
-    parent = parent->parent;
-  }
+  // // 如果是../格式，从当前目录的父目录开始
+  // if (path[0] == '.' && path[1] == '.') {
+  //   parent = parent->parent;
+  // }
 
   // 查找目标目录
   struct dentry *target = lookup_final_dentry(path, &parent, miss_name);
