@@ -28,6 +28,7 @@ extern uint64 htif;
 extern uint64 g_mem_size;
 // g_itrframe[NCPU]: per-hart interrupt frame for M-mode traps. added @lab1_2
 // (one frame per hart to avoid interference between cores)
+// 每个hart的M模式中断帧
 riscv_regs g_itrframe[NCPU];
 
 // sync barrier counter: all harts must reach here before any hart proceeds
@@ -103,11 +104,11 @@ void m_start(uintptr_t hartid, uintptr_t dtb) {
     init_dtb(dtb);
   }
 
-  sprint("In m_start, hartid:%d\n", hartid);
-
   // Synchronize all harts: wait until every hart reaches this barrier
   // before any hart proceeds to use HTIF resources.
   sync_barrier(&m_init_count, NCPU);
+
+  sprint("In m_start, hartid:%d\n", hartid);
 
   // Each hart independently saves its own M-mode interrupt frame address to
   // mscratch. added @lab1_2

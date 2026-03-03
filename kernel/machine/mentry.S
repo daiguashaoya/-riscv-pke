@@ -15,6 +15,7 @@ _mentry:
     # [mscratch] = 0; mscratch points the stack bottom of machine mode computer
     csrw mscratch, x0
 
+    # tp=mhartid，每个cpu的hartid不同，并都分配一个4kb的栈
     # save hartid in tp (thread pointer) register so S-mode code can access it later
     csrr tp, mhartid
 

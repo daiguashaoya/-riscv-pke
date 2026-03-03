@@ -139,6 +139,7 @@ void load_bincode_from_host_elf(process *p, int hartid) {
   // process.
   elf_info info;
 
+  // 为每个hart打开对应程序的elf文件
   info.f = spike_file_open(arg_bug_msg.argv[hartid], O_RDONLY, 0);
   info.p = p;
   // IS_ERR_VALUE is a macro defined in spike_interface/spike_htif.h
