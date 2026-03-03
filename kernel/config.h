@@ -4,20 +4,20 @@
 // we use two HART (cpu) in challenge3
 #define NCPU 2
 
-//interval of timer interrupt. added @lab1_3
+// interval of timer interrupt. added @lab1_3
 #define TIMER_INTERVAL 1000000
 
 #define DRAM_BASE 0x80000000
 
-/* we use fixed physical (also logical) addresses for the stacks and trap frames as in
- Bare memory-mapping mode */
-// user stack top
-#define USER_STACK 0x81100000
+/* Per-hart memory layout (64MB offset per hart):
+ * hart0: USER_STACK=0x81100000, USER_KSTACK=0x81200000,
+ * USER_TRAP_FRAME=0x81300000 hart1: USER_STACK=0x85100000,
+ * USER_KSTACK=0x85200000, USER_TRAP_FRAME=0x85300000
+ */
+#define HART_MEM_OFFSET 0x04000000UL // 64MB gap between harts
 
-// the stack used by PKE kernel when a syscall happens
-#define USER_KSTACK 0x81200000
-
-// the trap frame used to assemble the user "process"
-#define USER_TRAP_FRAME 0x81300000
+#define USER_STACK(id) (0x81100000UL + (id) * HART_MEM_OFFSET)
+#define USER_KSTACK(id) (0x81200000UL + (id) * HART_MEM_OFFSET)
+#define USER_TRAP_FRAME(id) (0x81300000UL + (id) * HART_MEM_OFFSET)
 
 #endif

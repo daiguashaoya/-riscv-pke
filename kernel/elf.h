@@ -1,8 +1,8 @@
 #ifndef _ELF_H_
 #define _ELF_H_
 
-#include "util/types.h"
 #include "process.h"
+#include "util/types.h"
 
 #define MAX_CMDLINE_ARGS 64
 
@@ -37,7 +37,7 @@ typedef struct elf_prog_header_t {
   uint64 align;  /* Segment alignment */
 } elf_prog_header;
 
-#define ELF_MAGIC 0x464C457FU  // "\x7FELF" in little endian
+#define ELF_MAGIC 0x464C457FU // "\x7FELF" in little endian
 #define ELF_PROG_LOAD 1
 
 typedef enum elf_status_t {
@@ -58,6 +58,6 @@ typedef struct elf_ctx_t {
 elf_status elf_init(elf_ctx *ctx, void *info);
 elf_status elf_load(elf_ctx *ctx);
 
-void load_bincode_from_host_elf(process *p);
+void load_bincode_from_host_elf(process *p, int hartid);
 
 #endif

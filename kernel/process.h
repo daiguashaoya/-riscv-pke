@@ -1,6 +1,7 @@
 #ifndef _PROC_H_
 #define _PROC_H_
 
+#include "config.h"
 #include "riscv.h"
 
 typedef struct trapframe_t {
@@ -13,18 +14,27 @@ typedef struct trapframe_t {
   /* offset:256 */ uint64 kernel_trap;
   // saved user process counter
   /* offset:264 */ uint64 epc;
-}trapframe;
+} trapframe;
 
 // the extremely simple definition of process, used for begining labs of PKE
 typedef struct process_t {
   // pointing to the stack used in trap handling.
   uint64 kstack;
   // trapframe storing the context of a (User mode) process.
-  trapframe* trapframe;
-}process;
+  trapframe *trapframe;
+} process;
 
-void switch_to(process*);
+void switch_to(process *);
 
-extern process* current;
+// per-hart current process pointer array (indexed by hartid)
+extern process *current[NCPU];
+
+// returns the hartid of the current hart using the tp register (set in
+// mentry.S)
+static inline int get_hartid() {
+  int id;
+  asm volatile("mv %0, tp" : "=r"(id));
+  return id;
+}
 
 #endif
