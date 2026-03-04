@@ -26,23 +26,27 @@ static uint64 heap_pa_to_va(uint64 pa) {
   panic("heap_pa_to_va: pa not found\n");
   return 0;
 }
-// 当前页空间不足时，需要扩展
-static void *heap_expand() {
-  if (current->heap_pages_cnt >= MAX_HEAP_PAGES)
+// 扩展 n_pages 个连续虚拟页（物理页可不连续），返回第一页的物理地址
+static void *heap_expand_pages(int n_pages) {
+  if (current->heap_pages_cnt + n_pages > MAX_HEAP_PAGES)
     panic("heap_expand: heap too large\n");
-  void *pa = alloc_page();
-  if (!pa)
-    panic("heap_expand: out of memory\n");
-  memset(pa, 0, PGSIZE);
-  uint64 va = current->heap_top;
-  current->heap_top += PGSIZE;
-  user_vm_map((pagetable_t)current->pagetable, va, PGSIZE, (uint64)pa,
-              prot_to_type(PROT_WRITE | PROT_READ, 1));
-  // 记录 pa <-> va 的对应关系
-  int idx = current->heap_pages_cnt++;
-  current->heap_pages_pa[idx] = (uint64)pa;
-  current->heap_pages_va[idx] = va;
-  return pa;
+  void *first_pa = NULL;
+  for (int i = 0; i < n_pages; i++) {
+    void *pa = alloc_page();
+    if (!pa)
+      panic("heap_expand: out of memory\n");
+    memset(pa, 0, PGSIZE);
+    uint64 va = current->heap_top;
+    current->heap_top += PGSIZE;
+    user_vm_map((pagetable_t)current->pagetable, va, PGSIZE, (uint64)pa,
+                prot_to_type(PROT_WRITE | PROT_READ, 1));
+    int idx = current->heap_pages_cnt++;
+    current->heap_pages_pa[idx] = (uint64)pa;
+    current->heap_pages_va[idx] = va;
+    if (i == 0)
+      first_pa = pa;
+  }
+  return first_pa;
 }
 
 //
@@ -70,16 +74,22 @@ ssize_t sys_user_exit(uint64 code) {
 }
 
 uint64 sys_user_allocate_page(int n) {
-  // 将 n 对齐到 8 字节，保证后续 MCB 的 next 指针始终 8 字节对齐
+  // 将 n 对齐到 8 字节，保证 MCB 的 next 指针始终 8 字节对齐
   n = (n + 7) & ~7;
   mem_block *blk = current->heap_head;
   mem_block *prev = NULL;
+
   // First-fit：查找第一个足够大的空闲块
   while (blk != NULL) {
     if (blk->free && blk->size >= n) {
-      // 分裂：若剩余空间还能再放一个 MCB + 至少 1 字节
-      if (blk->size >= n + (int)sizeof(mem_block) + 1) {
-        mem_block *split = (mem_block *)((char *)blk + sizeof(mem_block) + n);
+      // 计算 split MCB 的物理地址
+      uint64 blk_pa = (uint64)blk;
+      uint64 blk_page_end = (blk_pa & ~(uint64)(PGSIZE - 1)) + PGSIZE;
+      uint64 split_pa = blk_pa + sizeof(mem_block) + n;
+      // 仅当 split MCB 仍在同一物理页内时才分裂，避免跨页 PA 指针运算
+      if (split_pa + sizeof(mem_block) <= blk_page_end &&
+          blk->size >= n + (int)sizeof(mem_block) + 1) {
+        mem_block *split = (mem_block *)split_pa;
         split->size = blk->size - n - (int)sizeof(mem_block);
         split->free = 1;
         split->next = blk->next;
@@ -87,25 +97,25 @@ uint64 sys_user_allocate_page(int n) {
         blk->size = n;
       }
       blk->free = 0;
-      uint64 blk_va = heap_pa_to_va((uint64)blk);
-      return blk_va + sizeof(mem_block);
+      return heap_pa_to_va(blk_pa) + sizeof(mem_block);
     }
     prev = blk;
     blk = blk->next;
   }
-  // 未找到，扩展一页
-  mem_block *new_blk = (mem_block *)heap_expand();
-  new_blk->size = PGSIZE - (int)sizeof(mem_block);
+
+  // 未找到合适块，按需扩展足够的物理页
+  int pages_needed = (n + (int)sizeof(mem_block) + PGSIZE - 1) / PGSIZE;
+  mem_block *new_blk = (mem_block *)heap_expand_pages(pages_needed);
+  new_blk->size = pages_needed * PGSIZE - (int)sizeof(mem_block);
   new_blk->free = 1;
   new_blk->next = NULL;
+
   if (current->heap_head == NULL) {
     current->heap_head = new_blk;
   } else {
-    // 把 new_blk 接到链表末尾
-    // prev 此时指向链表最后一个节点
-    prev->next = new_blk;
+    prev->next = new_blk; // prev 指向链表最后一个节点
   }
-  // 再次尝试分配
+  // 再次尝试分配（此时一定找得到）
   return sys_user_allocate_page(n);
 }
 uint64 sys_user_free_page(uint64 va) {
