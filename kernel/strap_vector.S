@@ -42,6 +42,11 @@ smode_trap_vector:
     csrw satp, t1
     sfence.vma zero, zero
 
+    # restore tp from p->trapframe->hartid (offset 280) so get_hartid() works correctly.
+    # user code may freely overwrite tp (used as TLS), so we cannot trust it here.
+    # added @lab2_challenge3
+    ld tp, 280(a0)
+
     # jump to smode_trap_handler() that is defined in kernel/trap.c
     jr t0
 

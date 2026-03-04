@@ -24,5 +24,8 @@ _mentry:
     mul a3, a3, a4
     add sp, sp, a3		# re-arrange the stack points so that they don't overlap
 
+    # store hartid in tp so S-mode code can read it with "mv rd, tp"
+    csrr tp, mhartid
+
     # jump to mstart(), i.e., machine state start function in kernel/machine/minit.c
     call m_start
