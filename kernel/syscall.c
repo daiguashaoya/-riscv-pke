@@ -44,6 +44,9 @@ ssize_t sys_user_print(const char *buf, size_t n) {
 // added @lab2_challenge3
 //
 static volatile int hart_exited[NCPU] = {0};
+// Set to 1 once all NCPU harts have exited. Hart 0 watches this to call
+// shutdown. added @lab2_challenge3
+static volatile int all_done = 0;
 // Total count of harts that completed exit.  added @lab2_challenge3
 static volatile int exit_count = 0;
 
@@ -65,15 +68,22 @@ ssize_t sys_user_exit(uint64 code) {
                  : "memory");
 
     if (local + 1 == NCPU) {
-      // All harts done — shut down.
-      sprint("hartid = %d: shutdown with code: %d.\n", hartid, code);
-      shutdown(code);
+      // All harts done — signal hart 0 to shut down.
+      all_done = 1;
     }
   }
 
-  // Spin in a low-power loop waiting for the other hart to trigger shutdown.
-  while (1)
-    asm volatile("wfi");
+  if (hartid == 0) {
+    // Hart 0 waits until all harts have exited, then calls shutdown.
+    while (!all_done)
+      asm volatile("wfi");
+    sprint("hartid = 0: shutdown with code: %d.\n", code);
+    shutdown(code);
+  } else {
+    // Non-zero harts simply spin and wait for hart 0 to shut everything down.
+    while (1)
+      asm volatile("wfi");
+  }
 
   return 0; // unreachable
 }
