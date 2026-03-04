@@ -79,43 +79,70 @@ uint64 sys_user_allocate_page(int n) {
   mem_block *blk = current->heap_head;
   mem_block *prev = NULL;
 
-  // First-fit：查找第一个足够大的空闲块
+  // First-fit：查找第一个足够大的空闲块，同时追踪链表中最后一个空闲块
+  mem_block *last_free = NULL;
   while (blk != NULL) {
-    if (blk->free && blk->size >= n) {
-      // 计算 split MCB 的物理地址
-      uint64 blk_pa = (uint64)blk;
-      uint64 blk_page_end = (blk_pa & ~(uint64)(PGSIZE - 1)) + PGSIZE;
-      uint64 split_pa = blk_pa + sizeof(mem_block) + n;
-      // 仅当 split MCB 仍在同一物理页内时才分裂，避免跨页 PA 指针运算
-      if (split_pa + sizeof(mem_block) <= blk_page_end &&
-          blk->size >= n + (int)sizeof(mem_block) + 1) {
-        mem_block *split = (mem_block *)split_pa;
-        split->size = blk->size - n - (int)sizeof(mem_block);
-        split->free = 1;
-        split->next = blk->next;
-        blk->next = split;
-        blk->size = n;
+    if (blk->free) {
+      if (blk->size >= n) {
+        // 计算 split MCB 的物理地址
+        uint64 blk_pa = (uint64)blk;
+        uint64 blk_page_end = (blk_pa & ~(uint64)(PGSIZE - 1)) + PGSIZE;
+        uint64 split_pa = blk_pa + sizeof(mem_block) + n;
+        // 仅当 split MCB 仍在同一物理页内时才分裂，避免跨页 PA 指针运算
+        if (split_pa + sizeof(mem_block) <= blk_page_end &&
+            blk->size >= n + (int)sizeof(mem_block) + 1) {
+          mem_block *split = (mem_block *)split_pa;
+          split->size = blk->size - n - (int)sizeof(mem_block);
+          split->free = 1;
+          split->next = blk->next;
+          blk->next = split;
+          blk->size = n;
+        }
+        blk->free = 0;
+        return heap_pa_to_va(blk_pa) + sizeof(mem_block);
       }
-      blk->free = 0;
-      return heap_pa_to_va(blk_pa) + sizeof(mem_block);
+      last_free = blk; // 记录每个见到的空闲块（最终保留的是最靠后的那个）
     }
     prev = blk;
     blk = blk->next;
   }
 
-  // 未找到合适块，按需扩展足够的物理页
+  // 未找到合适块。
+  // 策略一：若链表尾部是空闲块，原地扩展它（保持地址紧凑，类似 sbrk）。
+  if (last_free != NULL && last_free->next == NULL) {
+    int extra = n - last_free->size;
+    int to_add = (extra + PGSIZE - 1) / PGSIZE;
+    if (current->heap_pages_cnt + to_add > MAX_HEAP_PAGES)
+      panic("better_malloc: heap too large\n");
+    for (int i = 0; i < to_add; i++) {
+      void *pa = alloc_page();
+      if (!pa)
+        panic("better_malloc: out of memory\n");
+      memset(pa, 0, PGSIZE);
+      uint64 va = current->heap_top;
+      current->heap_top += PGSIZE;
+      user_vm_map((pagetable_t)current->pagetable, va, PGSIZE, (uint64)pa,
+                  prot_to_type(PROT_WRITE | PROT_READ, 1));
+      int idx = current->heap_pages_cnt++;
+      current->heap_pages_pa[idx] = (uint64)pa;
+      current->heap_pages_va[idx] = va;
+      last_free->size += PGSIZE; // 扩大尾部空闲块的可用字节数
+    }
+    // 现在 last_free->size >= n，递归调用必然成功
+    return sys_user_allocate_page(n);
+  }
+
+  // 策略二：无可扩展的尾部空闲块，新建一个完整块（按需多页）
   int pages_needed = (n + (int)sizeof(mem_block) + PGSIZE - 1) / PGSIZE;
   mem_block *new_blk = (mem_block *)heap_expand_pages(pages_needed);
   new_blk->size = pages_needed * PGSIZE - (int)sizeof(mem_block);
   new_blk->free = 1;
   new_blk->next = NULL;
-
   if (current->heap_head == NULL) {
     current->heap_head = new_blk;
   } else {
-    prev->next = new_blk; // prev 指向链表最后一个节点
+    prev->next = new_blk;
   }
-  // 再次尝试分配（此时一定找得到）
   return sys_user_allocate_page(n);
 }
 uint64 sys_user_free_page(uint64 va) {
