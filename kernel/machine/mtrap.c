@@ -14,19 +14,19 @@ static void handle_store_access_fault() { panic("Store/AMO access fault!"); }
 
 //
 // print the source file name and the code line where exception happened.
-// sepc: the address of the instruction that triggered the exception.
+// mepc: the address of the instruction that triggered the exception.
 //
-void print_errorline(uint64 sepc) {
+void print_errorline(uint64 mepc) {
   // check that debug info has been loaded
   if (!current->line)
     return;
 
-  // Find the entry whose address is the largest one that is <= sepc.
+  // Find the entry whose address is the largest one that is <= mepc.
   // DWARF line info: each entry covers instructions from its addr up to
   // (but not including) the next entry's addr.
   int best = -1;
   for (int i = 0; i < current->line_ind; i++) {
-    if (current->line[i].addr <= sepc) {
+    if (current->line[i].addr <= mepc) {
       if (best == -1 || current->line[i].addr > current->line[best].addr)
         best = i;
     }

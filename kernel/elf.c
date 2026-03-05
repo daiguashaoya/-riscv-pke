@@ -363,7 +363,7 @@ void load_bincode_from_host_elf(process *p) {
   elf_sect_header sh;
   char name_buf[32]; // 用来存读取到的 Section 名字
 
-  // 确定symtab和strtab的文件偏移
+  // 确定debug_line的文件偏移
   for (int i = 0; i < elfloader.ehdr.shnum; i++) {
     // 1. 读取第 i 个 Section Header
     uint64 sh_offset = elfloader.ehdr.shoff + i * sizeof(elf_sect_header);
