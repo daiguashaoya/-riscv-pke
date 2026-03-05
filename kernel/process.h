@@ -8,7 +8,7 @@
 // 内存块结构体(mcb)
 typedef struct mem_block_t {
   int size;
-  int free;
+  int free;// 0: free, 1: used
   struct mem_block_t *next;
 } mem_block;
 

@@ -88,7 +88,7 @@ uint64 sys_user_allocate_page(int n) {
         uint64 blk_pa = (uint64)blk;
         uint64 blk_page_end = (blk_pa & ~(uint64)(PGSIZE - 1)) + PGSIZE;
         uint64 split_pa = blk_pa + sizeof(mem_block) + n;
-        // 仅当 split MCB 仍在同一物理页内时才分裂，避免跨页 PA 指针运算
+        // 仅当 split MCB 仍在同一物理页内时才分裂，避免跨页 PA 指针运算（物理页不连续，查询起来开销大）
         if (split_pa + sizeof(mem_block) <= blk_page_end &&
             blk->size >= n + (int)sizeof(mem_block) + 1) {
           mem_block *split = (mem_block *)split_pa;
@@ -145,6 +145,7 @@ uint64 sys_user_allocate_page(int n) {
   }
   return sys_user_allocate_page(n);
 }
+
 uint64 sys_user_free_page(uint64 va) {
   uint64 mcb_va = va - sizeof(mem_block);
   mem_block *blk = (mem_block *)user_va_to_pa((pagetable_t)current->pagetable,
