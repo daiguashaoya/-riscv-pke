@@ -32,9 +32,8 @@ extern uint64 g_mem_size;
 // Changed to array so each hart has its own frame. added @lab2_challenge3
 riscv_regs g_itrframe[NCPU];
 
-// Flag: set to 1 by hart 0 after HTIF/memory init completes. added
-// @lab2_challenge3
-static volatile int htif_init_done = 0;
+// 同步屏障，只有所有内核都到达这里才会继续执行
+static volatile int m_init_count = 0;
 
 //
 // get the information of HTIF (calling interface) and the emulated memory by
@@ -107,17 +106,11 @@ void m_start(uintptr_t hartid, uintptr_t dtb) {
     // init HTIF (Host-Target InterFace) and memory by using the Device Table
     // Blob (DTB)
     init_dtb(dtb);
-
-    // Signal other harts that init is done
-    htif_init_done = 1;
-  } else {
-    // Other harts wait until hart 0 finishes HTIF/memory init
-    while (htif_init_done == 0)
-      ;
-    // Now the spike file interface is ready, can print
-    spike_file_init();
-    sprint("In m_start, hartid:%d\n", hartid);
   }
+
+  // Synchronize all harts: wait until every hart reaches this barrier
+  // before any hart proceeds to use HTIF resources.
+  sync_barrier(&m_init_count, NCPU);
 
   // save the address of trap frame for interrupt in M mode to "mscratch". added
   // @lab1_2 Each hart uses its own slot in the g_itrframe array.
