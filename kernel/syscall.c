@@ -50,11 +50,12 @@ ssize_t sys_user_exit(uint64 code) {
   if (hartid == 0) {
     sprint("hartid = 0: shutdown with code:%d.\n", g_exit_code);
     shutdown(g_exit_code);
-  } else {
-    // Other harts spin-wait for hart0 to shut down the system.
-    while (1)
-      ;
-  }
+  } 
+  // else {
+  //   // Other harts spin-wait for hart0 to shut down the system.
+  //   while (1)
+  //     ;
+  // }
   return 0; // unreachable
 }
 

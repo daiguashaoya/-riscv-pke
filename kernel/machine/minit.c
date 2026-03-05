@@ -31,7 +31,7 @@ extern uint64 g_mem_size;
 // 每个hart的M模式中断帧
 riscv_regs g_itrframe[NCPU];
 
-// sync barrier counter: all harts must reach here before any hart proceeds
+// 同步屏障，只有所有内核都到达这里才会继续执行
 static volatile int m_init_count = 0;
 
 //
