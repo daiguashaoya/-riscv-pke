@@ -25,12 +25,14 @@ void print_errorline(uint64 mepc) {
   // DWARF line info: each entry covers instructions from its addr up to
   // (but not including) the next entry's addr.
   int best = -1;
+  // 查找到出错的行entry
   for (int i = 0; i < current->line_ind; i++) {
     if (current->line[i].addr <= mepc) {
       if (best == -1 || current->line[i].addr > current->line[best].addr)
         best = i;
     }
   }
+  // 找到该行的行号、文件、目录
   if (best != -1) {
     int i = best;
     if (1) {
@@ -40,7 +42,7 @@ void print_errorline(uint64 mepc) {
       uint64 dir_idx = current->file[file_idx].dir;
       char *dir = (dir_idx != (uint64)-1) ? current->dir[dir_idx] : NULL;
 
-      // build the full (relative or absolute) path
+      // 拼接成完整路径 打印
       char fullpath[128];
       if (dir && dir[0] != '\0') {
         strcpy(fullpath, dir);
@@ -52,12 +54,12 @@ void print_errorline(uint64 mepc) {
 
       sprint("Runtime error at %s:%d\n", fullpath, (int)line_no);
 
-      // open the source file and seek to the target line
+      // 打开源文件并跳转到目标行
       spike_file_t *f = spike_file_open(fullpath, O_RDONLY, 0);
       if (IS_ERR_VALUE(f))
         return;
 
-      // skip (line_no - 1) newlines to arrive at the right line
+      // 跳过(line_no - 1)个换行符到达目标行
       char c;
       uint64 cur_line = 1;
       while (cur_line < line_no) {
@@ -67,7 +69,7 @@ void print_errorline(uint64 mepc) {
           cur_line++;
       }
 
-      // read the target line into buf
+      // 读出这一行的代码内容
       char buf[256];
       int len = 0;
       while (spike_file_read(f, &c, 1) > 0 && c != '\n' && len < 255) {
@@ -76,7 +78,7 @@ void print_errorline(uint64 mepc) {
       buf[len] = '\0';
 
       if (len > 0)
-        sprint("  %s\n", buf);
+        sprint("%s\n", buf);
 
       spike_file_close(f);
       return;
