@@ -8,4 +8,7 @@ void* alloc_page();
 // Free an allocated page
 void free_page(void* pa);
 
+void inc_page_ref(void *pa);
+int get_page_ref(void *pa);
+
 #endif
