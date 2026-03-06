@@ -72,7 +72,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
       memcpy(new_pa, (void *)ROUNDDOWN((uint64)pa, PGSIZE), PGSIZE);
 
       // 重新设置该页的PTE，去掉 COW 标志，并加上 PTE_W 允许当前进程合法写操作
-      *pte = PA2PTE(new_pa) | ((PTE_FLAGS(*pte) | PTE_W) & ~PTE_COW);
+      *pte = PA2PTE(new_pa) | ((PTE_FLAGS(*pte) | PTE_W | PTE_D | PTE_A) & ~PTE_COW);
 
       // 最后释放对原来旧共享页面的引用计数，如果只剩1个引用则通过底层自动收回真正空间
       free_page((void *)pa);
