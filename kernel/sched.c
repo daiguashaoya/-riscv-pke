@@ -43,6 +43,7 @@ void insert_to_ready_queue( process* proc ) {
 //
 extern process procs[NPROC];
 void schedule() {
+  // 进程调度 ，就是调度就绪队列的队首元素，改为running；如果ready_queue_head为空，需要判断是不是所有进程都是free或者zombie
   if ( !ready_queue_head ){
     // by default, if there are no ready process, and all processes are in the status of
     // FREE and ZOMBIE, we should shutdown the emulated RISC-V machine.
