@@ -1,8 +1,8 @@
 #ifndef _ELF_H_
 #define _ELF_H_
 
-#include "util/types.h"
 #include "process.h"
+#include "util/types.h"
 
 #define MAX_CMDLINE_ARGS 64
 
@@ -26,9 +26,9 @@ typedef struct elf_header_t {
 } elf_header;
 
 // segment types, attributes of elf_prog_header_t.flags
-#define SEGMENT_READABLE   0x4
+#define SEGMENT_READABLE 0x4
 #define SEGMENT_EXECUTABLE 0x1
-#define SEGMENT_WRITABLE   0x2
+#define SEGMENT_WRITABLE 0x2
 
 // Program segment header.
 typedef struct elf_prog_header_t {
@@ -42,7 +42,7 @@ typedef struct elf_prog_header_t {
   uint64 align;  /* Segment alignment */
 } elf_prog_header;
 
-#define ELF_MAGIC 0x464C457FU  // "\x7FELF" in little endian
+#define ELF_MAGIC 0x464C457FU // "\x7FELF" in little endian
 #define ELF_PROG_LOAD 1
 
 typedef enum elf_status_t {
@@ -64,5 +64,7 @@ elf_status elf_init(elf_ctx *ctx, void *info);
 elf_status elf_load(elf_ctx *ctx);
 
 void load_bincode_from_host_elf(process *p);
+struct file;
+int load_bincode_from_vfs(struct file *file, process *p);
 
 #endif
