@@ -167,32 +167,43 @@ void load_bincode_from_host_elf(process *p) {
 
   sprint("Application: %s\n", arg_bug_msg.argv[0]);
 
-  // elf loading. elf_ctx is defined in kernel/elf.h, used to track the loading
-  // process.
-  elf_ctx elfloader;
-  // elf_info is defined above, used to tie the elf file and its corresponding
-  // process.
-  elf_info info;
+  // if the application is provided as a VFS path (starts with '/'), load it via
+  // VFS. this is needed for the platform testing challenge 2.
+  if (arg_bug_msg.argv[0][0] == '/') {
+    struct file *f = vfs_open(arg_bug_msg.argv[0], O_RDONLY);
+    if (f == NULL)
+      panic("Fail to open the input application program via VFS.\n");
+    if (load_bincode_from_vfs(f, p) != 0)
+      panic("Fail to load elf via VFS.\n");
+    vfs_close(f);
+  } else {
+    // elf loading. elf_ctx is defined in kernel/elf.h, used to track the
+    // loading process.
+    elf_ctx elfloader;
+    // elf_info is defined above, used to tie the elf file and its corresponding
+    // process.
+    elf_info info;
 
-  info.f = spike_file_open(arg_bug_msg.argv[0], O_RDONLY, 0);
-  info.p = p;
-  // IS_ERR_VALUE is a macro defined in spike_interface/spike_htif.h
-  if (IS_ERR_VALUE(info.f))
-    panic("Fail on openning the input application program.\n");
+    info.f = spike_file_open(arg_bug_msg.argv[0], O_RDONLY, 0);
+    info.p = p;
+    // IS_ERR_VALUE is a macro defined in spike_interface/spike_htif.h
+    if (IS_ERR_VALUE(info.f))
+      panic("Fail on openning the input application program.\n");
 
-  // init elfloader context. elf_init() is defined above.
-  if (elf_init(&elfloader, &info) != EL_OK)
-    panic("fail to init elfloader.\n");
+    // init elfloader context. elf_init() is defined above.
+    if (elf_init(&elfloader, &info) != EL_OK)
+      panic("fail to init elfloader.\n");
 
-  // load elf. elf_load() is defined above.
-  if (elf_load(&elfloader) != EL_OK)
-    panic("Fail on loading elf.\n");
+    // load elf. elf_load() is defined above.
+    if (elf_load(&elfloader) != EL_OK)
+      panic("Fail on loading elf.\n");
 
-  // entry (virtual, also physical in lab1_x) address
-  p->trapframe->epc = elfloader.ehdr.entry;
+    // entry (virtual, also physical in lab1_x) address
+    p->trapframe->epc = elfloader.ehdr.entry;
 
-  // close the host spike file
-  spike_file_close(info.f);
+    // close the host spike file
+    spike_file_close(info.f);
+  }
 
   sprint("Application program entry point (virtual address): 0x%lx\n",
          p->trapframe->epc);

@@ -293,6 +293,11 @@ int do_exec(char *path) {
     if (current->mapped_info[i].seg_type == CODE_SEGMENT ||
         current->mapped_info[i].seg_type == DATA_SEGMENT ||
         current->mapped_info[i].seg_type == HEAP_SEGMENT) {
+      uint64 va = current->mapped_info[i].va;
+      for (int k = 0; k < current->mapped_info[i].npages; k++) {
+        user_vm_unmap((pagetable_t)current->pagetable, va + k * PGSIZE, PGSIZE,
+                      1);
+      }
       current->mapped_info[i].va = 0;
       current->mapped_info[i].npages = 0;
       current->mapped_info[i].seg_type = 0;
