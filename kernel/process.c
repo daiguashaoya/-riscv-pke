@@ -283,12 +283,14 @@ int do_fork(process *parent) {
 
 // added @ lab4_challenge2 for exec
 int do_exec(char *path) {
+  // 打开指定的ELF文件
   struct file *f = vfs_open(path, O_RDONLY);
   if (f == NULL) {
     sprint("do_exec: failed to open %s\n", path);
     return -1;
   }
 
+  // 清空当前进程的虚拟地址空间（代码段、数据段、堆段）
   for (int i = 0; i < current->total_mapped_region; i++) {
     if (current->mapped_info[i].seg_type == CODE_SEGMENT ||
         current->mapped_info[i].seg_type == DATA_SEGMENT ||
@@ -312,6 +314,7 @@ int do_exec(char *path) {
 
   vfs_close(f);
 
+  // 重置栈指针和堆信息
   current->trapframe->regs.sp = USER_STACK_TOP;
   current->user_heap.heap_top = USER_FREE_ADDRESS_START;
   current->user_heap.heap_bottom = USER_FREE_ADDRESS_START;

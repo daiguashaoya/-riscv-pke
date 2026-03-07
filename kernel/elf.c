@@ -222,6 +222,7 @@ static uint64 elf_fpread_vfs(elf_ctx *ctx, void *dest, uint64 nb,
   return vfs_read(msg->f, dest, nb);
 }
 
+// 为 ELF segment 分配一个物理页，并映射到用户虚拟地址
 static void *elf_alloc_mb_vfs(elf_ctx *ctx, uint64 elf_pa, uint64 elf_va,
                               uint64 size) {
   elf_info_vfs *msg = (elf_info_vfs *)ctx->info;
@@ -238,15 +239,20 @@ static void *elf_alloc_mb_vfs(elf_ctx *ctx, uint64 elf_pa, uint64 elf_va,
 }
 
 static elf_status elf_init_vfs(elf_ctx *ctx, void *info) {
+  // 保存 ELF loader 的上下文信息（file、process）
   ctx->info = info;
+  // 读取 ELF header
   if (elf_fpread_vfs(ctx, &ctx->ehdr, sizeof(ctx->ehdr), 0) !=
       sizeof(ctx->ehdr))
     return EL_EIO;
+  // 检查 ELF magic
   if (ctx->ehdr.magic != ELF_MAGIC)
     return EL_NOTELF;
   return EL_OK;
 }
 
+// 遍历 ELF 的 Program Header表，
+// 把所有需要加载的段（segment）读入内存，并建立进程的虚拟内存映射。
 static elf_status elf_load_vfs(elf_ctx *ctx) {
   elf_prog_header ph_addr;
   int i, off;
@@ -267,10 +273,12 @@ static elf_status elf_load_vfs(elf_ctx *ctx) {
     void *dest =
         elf_alloc_mb_vfs(ctx, ph_addr.vaddr, ph_addr.vaddr, ph_addr.memsz);
 
+    // 把 segment 数据复制到刚分配的页
     if (elf_fpread_vfs(ctx, dest, ph_addr.memsz, ph_addr.off) != ph_addr.memsz)
       return EL_EIO;
 
     int j;
+    // 记录映射信息
     for (j = 0; j < PGSIZE / sizeof(mapped_region); j++)
       if ((process *)(((elf_info_vfs *)(ctx->info))->p)->mapped_info[j].va ==
           0x0)
