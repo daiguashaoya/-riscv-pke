@@ -1,0 +1,51 @@
+compiling util/hash_table.c
+compiling util/snprintf.c
+compiling util/string.c
+linking  obj/util.a ...
+Util lib has been build into "obj/util.a"
+compiling spike_interface/dts_parse.c
+compiling spike_interface/spike_file.c
+compiling spike_interface/spike_htif.c
+compiling spike_interface/spike_memory.c
+compiling spike_interface/spike_utils.c
+linking  obj/spike_interface.a ...
+Spike lib has been build into "obj/spike_interface.a"
+compiling kernel/elf.c
+compiling kernel/hostfs.c
+compiling kernel/kernel.c
+compiling kernel/pmm.c
+compiling kernel/process.c
+compiling kernel/proc_file.c
+compiling kernel/ramdev.c
+compiling kernel/rfs.c
+compiling kernel/sched.c
+compiling kernel/strap.c
+compiling kernel/syscall.c
+compiling kernel/vfs.c
+compiling kernel/vmm.c
+compiling kernel/machine/minit.c
+compiling kernel/machine/mtrap.c
+compiling kernel/strap_vector.S
+compiling kernel/machine/mentry.S
+compiling kernel/machine/mtrap_vector.S
+linking obj/riscv-pke ...
+PKE core has been built into "obj/riscv-pke"
+compiling user/app_shell.c
+compiling user/user_lib.c
+linking hostfs_root/bin/app_shell ...
+User app has been built into "hostfs_root/bin/app_shell"
+compiling user/app_ls.c
+linking hostfs_root/bin/app_ls ...
+User app has been built into "hostfs_root/bin/app_ls"
+compiling user/app_mkdir.c
+linking hostfs_root/bin/app_mkdir ...
+User app has been built into "hostfs_root/bin/app_mkdir"
+compiling user/app_touch.c
+linking hostfs_root/bin/app_touch ...
+User app has been built into "hostfs_root/bin/app_touch"
+compiling user/app_cat.c
+linking hostfs_root/bin/app_cat ...
+User app has been built into "hostfs_root/bin/app_cat"
+compiling user/app_echo.c
+linking hostfs_root/bin/app_echo ...
+User app has been built into "hostfs_root/bin/app_echo"

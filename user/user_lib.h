@@ -4,13 +4,13 @@
 
 #ifndef _USER_LIB_H_
 #define _USER_LIB_H_
-#include "util/types.h"
 #include "kernel/proc_file.h"
+#include "util/types.h"
 
 int printu(const char *s, ...);
 int exit(int code);
-void* naive_malloc();
-void naive_free(void* va);
+void *naive_malloc();
+void naive_free(void *va);
 int fork();
 void yield();
 
@@ -33,5 +33,8 @@ int closedir_u(int fd);
 int link_u(const char *fn1, const char *fn2);
 int unlink_u(const char *fn);
 
+// added @ lab4_challenge3
+int exec(const char *path, const char *para);
+int wait(int pid);
 
 #endif

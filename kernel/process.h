@@ -1,8 +1,8 @@
 #ifndef _PROC_H_
 #define _PROC_H_
 
-#include "riscv.h"
 #include "proc_file.h"
+#include "riscv.h"
 
 typedef struct trapframe_t {
   // space to store context (all common registers)
@@ -17,7 +17,7 @@ typedef struct trapframe_t {
 
   // kernel page table. added @lab2_1
   /* offset:272 */ uint64 kernel_satp;
-}trapframe;
+} trapframe;
 
 // riscv-pke kernel supports at most 32 processes
 #define NPROC 32
@@ -26,21 +26,21 @@ typedef struct trapframe_t {
 
 // possible status of a process
 enum proc_status {
-  FREE,            // unused state
-  READY,           // ready state
-  RUNNING,         // currently running
-  BLOCKED,         // waiting for something
-  ZOMBIE,          // terminated but not reclaimed yet
+  FREE,    // unused state
+  READY,   // ready state
+  RUNNING, // currently running
+  BLOCKED, // waiting for something
+  ZOMBIE,  // terminated but not reclaimed yet
 };
 
 // types of a segment
 enum segment_type {
-  STACK_SEGMENT = 0,   // runtime stack segment
-  CONTEXT_SEGMENT, // trapframe segment
-  SYSTEM_SEGMENT,  // system segment
-  HEAP_SEGMENT,    // runtime heap segment
-  CODE_SEGMENT,    // ELF segment
-  DATA_SEGMENT,    // ELF segment
+  STACK_SEGMENT = 0, // runtime stack segment
+  CONTEXT_SEGMENT,   // trapframe segment
+  SYSTEM_SEGMENT,    // system segment
+  HEAP_SEGMENT,      // runtime heap segment
+  CODE_SEGMENT,      // ELF segment
+  DATA_SEGMENT,      // ELF segment
 };
 
 // the VM regions mapped to a user process
@@ -60,7 +60,7 @@ typedef struct process_heap_manager {
   uint64 free_pages_address[MAX_HEAP_PAGES];
   // the number of free pages in the heap
   uint32 free_pages_count;
-}process_heap_manager;
+} process_heap_manager;
 
 // the extremely simple definition of process, used for begining labs of PKE
 typedef struct process_t {
@@ -69,8 +69,8 @@ typedef struct process_t {
   // user page table
   pagetable_t pagetable;
   // trapframe storing the context of a (User mode) process.
-  //中断帧指针 用于保护现场（例如pc、寄存器)
-  trapframe* trapframe;
+  // 中断帧指针 用于保护现场（例如pc、寄存器)
+  trapframe *trapframe;
 
   // points to a page that contains mapped_regions. below are added @lab3_1
   mapped_region *mapped_info;
@@ -90,26 +90,36 @@ typedef struct process_t {
   // next queue element
   struct process_t *queue_next;
 
+  // for wait syscall: pid of the child this process is waiting for (-1 = none)
+  // added @lab4_challenge3
+  int waiting_for_pid;
+
   // accounting. added @lab3_3
   int tick_count;
 
   // file system. added @lab4_1
   proc_file_management *pfiles;
-}process;
+} process;
 
 // switch to run user app
-void switch_to(process*);
+void switch_to(process *);
 
 // initialize process pool (the procs[] array)
 void init_proc_pool();
 // allocate an empty process, init its vm space. returns its pid
-process* alloc_process();
+process *alloc_process();
 // reclaim a process, destruct its vm space and free physical pages.
-int free_process( process* proc );
+int free_process(process *proc);
 // fork a child from parent
-int do_fork(process* parent);
+int do_fork(process *parent);
+// exec: replace current process image with a new ELF
+// added @lab4_challenge3
+int do_exec(char *path, char *para);
+// wait: block until child (pid) exits
+// added @lab4_challenge3
+int do_wait(int pid);
 
 // current running process
-extern process* current;
+extern process *current;
 
 #endif
