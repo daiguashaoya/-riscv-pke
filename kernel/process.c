@@ -248,12 +248,15 @@ int do_fork(process *parent) {
       memcpy((void *)&child->user_heap, (void *)&parent->user_heap,
              sizeof(parent->user_heap));
     } break;
-    case CODE_SEGMENT:
+    case CODE_SEGMENT: {
       // map child code to parent's physical code pages (shared, not copied)
+      uint64 code_pa = lookup_pa(parent->pagetable, parent->mapped_info[i].va);
       map_pages(child->pagetable, parent->mapped_info[i].va,
-                parent->mapped_info[i].npages * PGSIZE,
-                lookup_pa(parent->pagetable, parent->mapped_info[i].va),
+                parent->mapped_info[i].npages * PGSIZE, code_pa,
                 prot_to_type(PROT_EXEC | PROT_READ, 1));
+      sprint(
+          "do_fork map code segment at pa:%lx of parent to child at va:%lx.\n",
+          code_pa, parent->mapped_info[i].va);
 
       // after mapping, register the vm region (do not delete codes below!)
       child->mapped_info[child->total_mapped_region].va =
@@ -262,7 +265,7 @@ int do_fork(process *parent) {
           parent->mapped_info[i].npages;
       child->mapped_info[child->total_mapped_region].seg_type = CODE_SEGMENT;
       child->total_mapped_region++;
-      break;
+    } break;
     // 复制数据段 (added @lab4_challenge3)
     case DATA_SEGMENT: {
       // DATA pages are per-process, so copy them (like STACK)
@@ -406,5 +409,7 @@ int do_wait(int pid) {
   current->status = BLOCKED;
   schedule(); // switch to another process; free_process() will re-queue us
 
+  // child has exited; reclaim its process slot
+  child->status = FREE;
   return pid;
 }
