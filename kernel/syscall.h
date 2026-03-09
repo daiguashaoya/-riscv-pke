@@ -4,6 +4,8 @@
 #ifndef _SYSCALL_H_
 #define _SYSCALL_H_
 
+#include "util/types.h"
+
 // syscalls of PKE OS kernel. append below if adding new syscalls.
 #define SYS_user_base 64
 #define SYS_user_print (SYS_user_base + 0)
@@ -33,8 +35,16 @@
 // added @lab4_challenge3
 #define SYS_user_exec (SYS_user_base + 30)
 #define SYS_user_wait (SYS_user_base + 31)
+#define SYS_user_backtrace (SYS_user_base + 32)
+#define SYS_user_sem_new (SYS_user_base + 33)
+#define SYS_user_sem_P (SYS_user_base + 34)
+#define SYS_user_sem_V (SYS_user_base + 35)
+#define SYS_user_rcwd (SYS_user_base + 36)
+#define SYS_user_ccwd (SYS_user_base + 37)
+// added @lab1_challenge1
 
 long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
                 long a7);
+ssize_t sys_user_exit(uint64 code);
 
 #endif

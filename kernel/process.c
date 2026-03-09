@@ -32,7 +32,9 @@ extern char trap_sec_start[];
 process procs[NPROC];
 
 // current points to the currently running user-mode application.
-process *current = NULL;
+#undef current
+process *current_proc[NCPU] = {NULL};
+#define current (current_proc[get_hartid()])
 
 //
 // switch to a user-mode process
@@ -154,7 +156,8 @@ process *alloc_process() {
   // initialize the process's heap manager
   procs[i].user_heap.heap_top = USER_FREE_ADDRESS_START;
   procs[i].user_heap.heap_bottom = USER_FREE_ADDRESS_START;
-  procs[i].user_heap.free_pages_count = 0;
+  procs[i].user_heap.heap_head = NULL;
+  procs[i].user_heap.heap_pages_cnt = 0;
 
   // map user heap in userspace
   procs[i].mapped_info[HEAP_SEGMENT].va = USER_FREE_ADDRESS_START;
@@ -186,10 +189,13 @@ int free_process(process *proc) {
 
   // if the parent process is waiting for this child, wake it up. added
   // @lab4_challenge3
-  // 检查父进程是否在等待这个子进程
+  // 检查父进程是否在等待这个子进程 (包括等待任意子进程情况: -1)
   if (proc->parent != NULL && proc->parent->status == BLOCKED &&
-      proc->parent->waiting_for_pid == (int)proc->pid) {
+      (proc->parent->waiting_for_pid == (int)proc->pid ||
+       proc->parent->waiting_for_pid == -1)) {
     proc->parent->waiting_for_pid = -1;
+    proc->parent->trapframe->regs.a0 =
+        proc->pid; // 唤醒时设置返回值为退出的子进程PID
     insert_to_ready_queue(proc->parent);
   }
 
@@ -223,31 +229,33 @@ int do_fork(process *parent) {
              PGSIZE);
       break;
     // 复制用了的堆页 (added @lab4_challenge3)
+    // COW shared mapping for Heap
     case HEAP_SEGMENT: {
-      // build a same heap for child by copying every live heap page
-      int free_block_filter[MAX_HEAP_PAGES];
-      memset(free_block_filter, 0, sizeof(free_block_filter));
-      uint64 heap_bottom = parent->user_heap.heap_bottom;
-      for (int j = 0; j < (int)parent->user_heap.free_pages_count; j++) {
-        int idx =
-            (int)((parent->user_heap.free_pages_address[j] - heap_bottom) /
-                  PGSIZE);
-        free_block_filter[idx] = 1;
+      for (int h = 0; h < parent->user_heap.heap_pages_cnt; h++) {
+        uint64 hb = parent->user_heap.heap_pages_va[h];
+        void *pa = (void *)lookup_pa(parent->pagetable, hb);
+        inc_page_ref(pa);
+
+        pte_t *pte_parent = page_walk(parent->pagetable, hb, 0);
+        *pte_parent = (*pte_parent & ~PTE_W) | PTE_COW;
+
+        user_vm_map((pagetable_t)child->pagetable, hb, PGSIZE, (uint64)pa,
+                    prot_to_type(PROT_READ, 1));
+
+        pte_t *pte_child = page_walk((pagetable_t)child->pagetable, hb, 0);
+        *pte_child |= PTE_COW;
+
+        child->user_heap.heap_pages_pa[h] =
+            (uint64)pa; // It will be the same pa
+        child->user_heap.heap_pages_va[h] = hb;
       }
-      for (uint64 hb = parent->user_heap.heap_bottom;
-           hb < parent->user_heap.heap_top; hb += PGSIZE) {
-        int idx = (int)((hb - heap_bottom) / PGSIZE);
-        if (free_block_filter[idx])
-          continue; // skip freed pages
-        void *child_pa = alloc_page();
-        memcpy(child_pa, (void *)lookup_pa(parent->pagetable, hb), PGSIZE);
-        user_vm_map((pagetable_t)child->pagetable, hb, PGSIZE, (uint64)child_pa,
-                    prot_to_type(PROT_WRITE | PROT_READ, 1));
-      }
+      child->user_heap.heap_pages_cnt = parent->user_heap.heap_pages_cnt;
+      child->user_heap.heap_bottom = parent->user_heap.heap_bottom;
+      child->user_heap.heap_top = parent->user_heap.heap_top;
+      child->user_heap.heap_head = parent->user_heap.heap_head;
       child->mapped_info[HEAP_SEGMENT].npages =
-          parent->mapped_info[HEAP_SEGMENT].npages;
-      memcpy((void *)&child->user_heap, (void *)&parent->user_heap,
-             sizeof(parent->user_heap));
+          parent->user_heap.heap_pages_cnt;
+      flush_tlb();
     } break;
     case CODE_SEGMENT: {
       // map child code to parent's physical code pages (shared, not copied)
@@ -268,14 +276,21 @@ int do_fork(process *parent) {
       child->total_mapped_region++;
     } break;
     // 复制数据段 (added @lab4_challenge3)
+    // COW shared mapping for Data
     case DATA_SEGMENT: {
-      // DATA pages are per-process, so copy them (like STACK)
       for (int pg = 0; pg < (int)parent->mapped_info[i].npages; pg++) {
         uint64 data_va = parent->mapped_info[i].va + pg * PGSIZE;
-        void *child_pa = alloc_page();
-        memcpy(child_pa, (void *)lookup_pa(parent->pagetable, data_va), PGSIZE);
-        user_vm_map((pagetable_t)child->pagetable, data_va, PGSIZE,
-                    (uint64)child_pa, prot_to_type(PROT_WRITE | PROT_READ, 1));
+        void *pa = (void *)lookup_pa(parent->pagetable, data_va);
+        inc_page_ref(pa);
+
+        pte_t *pte_parent = page_walk(parent->pagetable, data_va, 0);
+        *pte_parent = (*pte_parent & ~PTE_W) | PTE_COW;
+
+        user_vm_map((pagetable_t)child->pagetable, data_va, PGSIZE, (uint64)pa,
+                    prot_to_type(PROT_READ, 1));
+
+        pte_t *pte_child = page_walk((pagetable_t)child->pagetable, data_va, 0);
+        *pte_child |= PTE_COW;
       }
       child->mapped_info[child->total_mapped_region].va =
           parent->mapped_info[i].va;
@@ -283,6 +298,7 @@ int do_fork(process *parent) {
           parent->mapped_info[i].npages;
       child->mapped_info[child->total_mapped_region].seg_type = DATA_SEGMENT;
       child->total_mapped_region++;
+      flush_tlb();
     } break;
     }
   }
@@ -365,13 +381,14 @@ int do_exec(char *path, char *para) {
   sp = ROUNDDOWN(sp, 16);
 
   // Step 6: now that path and para have been fully consumed, clean up old heap
-  for (uint64 hb = current->user_heap.heap_bottom;
-       hb < current->user_heap.heap_top; hb += PGSIZE) {
-    user_vm_unmap(current->pagetable, hb, PGSIZE, 1);
+  for (int h = 0; h < current->user_heap.heap_pages_cnt; h++) {
+    user_vm_unmap(current->pagetable, current->user_heap.heap_pages_va[h],
+                  PGSIZE, 1);
   }
   current->user_heap.heap_top = USER_FREE_ADDRESS_START;
   current->user_heap.heap_bottom = USER_FREE_ADDRESS_START;
-  current->user_heap.free_pages_count = 0;
+  current->user_heap.heap_head = NULL;
+  current->user_heap.heap_pages_cnt = 0;
   current->mapped_info[HEAP_SEGMENT].npages = 0;
 
   // Step 7: set up trapframe registers for the new program entry
@@ -386,31 +403,37 @@ int do_exec(char *path, char *para) {
 //
 // do_wait: block current process until child (pid) exits.
 // added @lab4_challenge3
-//
 int do_wait(int pid) {
-  // find the target child process
-  process *child = NULL;
+  // 遍历所有进程，寻找属于当前进程的子进程
+  int has_child = 0;
+
   for (int i = 0; i < NPROC; i++) {
-    if ((int)procs[i].pid == pid && procs[i].parent == current) {
-      child = &procs[i];
-      break;
+    // 筛选条件: 是当前进程的子进程
+    if (procs[i].parent == current) {
+      // 筛选 PID: pid==-1 (任意) 或 pid匹配
+      if (pid == -1 || (int)procs[i].pid == pid) {
+        has_child = 1;
+
+        // 情况 1: 发现僵尸子进程 (已退出)
+        if (procs[i].status == ZOMBIE) {
+          int zpid = procs[i].pid;
+          // 回收资源
+          procs[i].status = FREE;
+          return zpid;
+        }
+      }
     }
   }
-  if (child == NULL)
-    return -1;
 
-  // if child already exited, return immediately
-  if (child->status == ZOMBIE) {
-    child->status = FREE;
-    return pid;
+  // 情况 2: 还有符合条件的子进程在运行，父进程进入阻塞状态
+  if (has_child) {
+    current->status = BLOCKED;      // 设为阻塞
+    current->waiting_for_pid = pid; // 记录在等谁
+    schedule();                     // 让出 CPU
+    // 注意：当被唤醒时，返回值由唤醒者(子进程exit)直接写入 trapframe->a0
+    return 0; // 这里的返回值实际上会被覆盖
   }
 
-  // block current process and wait for child to exit
-  current->waiting_for_pid = pid;
-  current->status = BLOCKED;
-  schedule(); // switch to another process; free_process() will re-queue us
-
-  // child has exited; reclaim its process slot
-  child->status = FREE;
-  return pid;
+  // 情况 3: 没有找到任何符合条件的子进程
+  return -1;
 }

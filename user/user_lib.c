@@ -53,13 +53,21 @@ int exit(int code) {
 // lib call to naive_malloc
 //
 void *naive_malloc() {
-  return (void *)do_user_call(SYS_user_allocate_page, 0, 0, 0, 0, 0, 0, 0);
+  return (void *)do_user_call(SYS_user_allocate_page, 4096, 0, 0, 0, 0, 0, 0);
 }
 
 //
 // lib call to naive_free
 //
 void naive_free(void *va) {
+  do_user_call(SYS_user_free_page, (uint64)va, 0, 0, 0, 0, 0, 0);
+}
+
+void *better_malloc(int n) {
+  return (void *)do_user_call(SYS_user_allocate_page, n, 0, 0, 0, 0, 0, 0);
+}
+
+void better_free(void *va) {
   do_user_call(SYS_user_free_page, (uint64)va, 0, 0, 0, 0, 0, 0);
 }
 
@@ -170,8 +178,36 @@ int exec(const char *path, const char *para) {
 }
 
 //
+// lib call to read present working directory (pwd)
+//
+int read_cwd(char *path) {
+  return do_user_call(SYS_user_rcwd, (uint64)path, 0, 0, 0, 0, 0, 0);
+}
+
+//
+// lib call to change pwd
+//
+int change_cwd(const char *path) {
+  return do_user_call(SYS_user_ccwd, (uint64)path, 0, 0, 0, 0, 0, 0);
+}
 // lib call to wait: parent waits for child process (pid) to finish.
 //
 int wait(int pid) {
   return do_user_call(SYS_user_wait, (uint64)pid, 0, 0, 0, 0, 0, 0);
 }
+
+void print_backtrace(int depth) {
+  do_user_call(SYS_user_backtrace, depth, 0, 0, 0, 0, 0, 0);
+}
+
+// Lab 3 / Lab 4 Challenge Stubs
+int sem_new(int val) {
+  return do_user_call(SYS_user_sem_new, val, 0, 0, 0, 0, 0, 0);
+}
+void sem_P(int sem_id) {
+  do_user_call(SYS_user_sem_P, sem_id, 0, 0, 0, 0, 0, 0);
+}
+void sem_V(int sem_id) {
+  do_user_call(SYS_user_sem_V, sem_id, 0, 0, 0, 0, 0, 0);
+}
+void printpa(int *vadr) {}

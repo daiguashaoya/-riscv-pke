@@ -5,14 +5,17 @@
 #include <errno.h>
 #include <stdint.h>
 
+#include "elf.h"
 #include "pmm.h"
 #include "proc_file.h"
 #include "process.h"
 #include "sched.h"
+#include "semaphore.h"
 #include "string.h"
 #include "syscall.h"
 #include "util/functions.h"
 #include "util/types.h"
+#include "vfs.h"
 #include "vmm.h"
 
 #include "spike_interface/spike_utils.h"
@@ -42,40 +45,231 @@ ssize_t sys_user_exit(uint64 code) {
   return 0;
 }
 
-//
-// maybe, the simplest implementation of malloc in the world ... added @lab2_2
-//
-uint64 sys_user_allocate_page() {
-  void *pa = alloc_page();
-  uint64 va;
-  // if there are previously reclaimed pages, use them first (this does not
-  // change the size of the heap)
-  if (current->user_heap.free_pages_count > 0) {
-    va = current->user_heap
-             .free_pages_address[--current->user_heap.free_pages_count];
-    assert(va < current->user_heap.heap_top);
-  } else {
-    // otherwise, allocate a new page (this increases the size of the heap by
-    // one page)
-    va = current->user_heap.heap_top;
-    current->user_heap.heap_top += PGSIZE;
+void print_symbol(struct file *f, elf_sect_header *symtab,
+                  elf_sect_header *strtab, uint64_t addr) {
+  elf_sym sym;
+  for (uint64_t off = 0; off < symtab->size; off += sizeof(sym)) {
+    vfs_lseek(f, symtab->offset + off, SEEK_SET);
+    vfs_read(f, (char *)&sym, sizeof(sym));
 
-    current->mapped_info[HEAP_SEGMENT].npages++;
+    // Check if it's a function (STT_FUNC = 2)
+    if ((sym.info & 0xf) != 2)
+      continue;
+
+    if (addr >= sym.value && addr < sym.value + sym.size) {
+      char name[64];
+      // Read symbol name from string table
+      vfs_lseek(f, strtab->offset + sym.name, SEEK_SET);
+      vfs_read(f, name, sizeof(name));
+      name[63] = '\0'; // Ensure null termination
+      sprint("%s\n", name);
+      return;
+    }
   }
-  user_vm_map((pagetable_t)current->pagetable, va, PGSIZE, (uint64)pa,
-              prot_to_type(PROT_WRITE | PROT_READ, 1));
+  sprint("???\n");
+}
 
-  return va;
+ssize_t sys_user_backtrace(int depth) {
+  struct file *f = vfs_open(current->app_name, O_RDONLY);
+  if (IS_ERR_VALUE(f)) {
+    sprint("Failed to open ELF file: %s\n", current->app_name);
+    return -1;
+  }
+
+  elf_header ehdr;
+  vfs_lseek(f, 0, SEEK_SET);
+  vfs_read(f, (char *)&ehdr, sizeof(ehdr));
+
+  // Read section header string table header
+  elf_sect_header shstrtab_hdr;
+  vfs_lseek(f, ehdr.shoff + ehdr.shstrndx * ehdr.shentsize, SEEK_SET);
+  vfs_read(f, (char *)&shstrtab_hdr, sizeof(shstrtab_hdr));
+
+  // Read section header string table
+  char shstrtab_buf[4096];
+  if (shstrtab_hdr.size > sizeof(shstrtab_buf)) {
+    sprint("shstrtab too big\n");
+    vfs_close(f);
+    return -1;
+  }
+  vfs_lseek(f, shstrtab_hdr.offset, SEEK_SET);
+  vfs_read(f, shstrtab_buf, shstrtab_hdr.size);
+
+  elf_sect_header symtab_hdr, strtab_hdr;
+  int found_symtab = 0, found_strtab = 0;
+
+  for (int i = 0; i < ehdr.shnum; i++) {
+    elf_sect_header shdr;
+    vfs_lseek(f, ehdr.shoff + i * ehdr.shentsize, SEEK_SET);
+    vfs_read(f, (char *)&shdr, sizeof(shdr));
+
+    char *name = shstrtab_buf + shdr.name;
+    if (strcmp(name, ".symtab") == 0) {
+      symtab_hdr = shdr;
+      found_symtab = 1;
+    } else if (strcmp(name, ".strtab") == 0) {
+      strtab_hdr = shdr;
+      found_strtab = 1;
+    }
+  }
+
+  if (!found_symtab || !found_strtab) {
+    sprint("Symbol table or string table not found\n");
+    vfs_close(f);
+    return -1;
+  }
+
+  uint64_t fp = current->trapframe->regs.s0;
+
+  // Skip do_user_call frame
+  fp = *(uint64_t *)(fp - 8);
+  // Get return address to f8 (from print_backtrace frame)
+  uint64_t ra = *(uint64_t *)(fp - 8);
+  // Go to f8 frame
+  fp = *(uint64_t *)(fp - 16);
+
+  // Print f8
+  print_symbol(f, &symtab_hdr, &strtab_hdr, ra);
+
+  for (int i = 0; i < depth - 1; i++) {
+    if (fp == 0)
+      break;
+    ra = *(uint64_t *)(fp - 8);
+    fp = *(uint64_t *)(fp - 16);
+    print_symbol(f, &symtab_hdr, &strtab_hdr, ra);
+  }
+
+  vfs_close(f);
+  return 0;
+}
+
+// 将 pa 转换为 va
+static uint64 heap_pa_to_va(uint64 pa) {
+  for (int i = 0; i < current->user_heap.heap_pages_cnt; i++) {
+    uint64 base_pa = current->user_heap.heap_pages_pa[i];
+    if (pa >= base_pa && pa < base_pa + PGSIZE) {
+      return current->user_heap.heap_pages_va[i] + (pa - base_pa);
+    }
+  }
+  panic("heap_pa_to_va: pa not found\n");
+  return 0;
+}
+
+// 扩展 n_pages 个连续虚拟页（物理页可不连续），返回第一页的物理地址
+static void *heap_expand_pages(int n_pages) {
+  if (current->user_heap.heap_pages_cnt + n_pages > MAX_HEAP_PAGES)
+    panic("heap_expand: heap too large\n");
+  void *first_pa = NULL;
+  for (int i = 0; i < n_pages; i++) {
+    void *pa = alloc_page();
+    if (!pa)
+      panic("heap_expand: out of memory\n");
+    memset(pa, 0, PGSIZE);
+    uint64 va = current->user_heap.heap_top;
+    current->user_heap.heap_top += PGSIZE;
+    user_vm_map((pagetable_t)current->pagetable, va, PGSIZE, (uint64)pa,
+                prot_to_type(PROT_WRITE | PROT_READ, 1));
+    int idx = current->user_heap.heap_pages_cnt++;
+    current->user_heap.heap_pages_pa[idx] = (uint64)pa;
+    current->user_heap.heap_pages_va[idx] = va;
+    current->mapped_info[HEAP_SEGMENT].npages++;
+    if (i == 0)
+      first_pa = pa;
+  }
+  return first_pa;
+}
+
+//
+// better implementation of malloc
+//
+uint64 sys_user_allocate_page(int n) {
+  if (n <= 0)
+    return 0;
+  // 将 n 对齐到 8 字节
+  n = (n + 7) & ~7;
+  mem_block *blk = current->user_heap.heap_head;
+  mem_block *prev = NULL;
+
+  mem_block *last_free = NULL;
+  while (blk != NULL) {
+    if (blk->free) {
+      if (blk->size >= n) {
+        uint64 blk_pa = (uint64)blk;
+        uint64 blk_page_end = (blk_pa & ~(uint64)(PGSIZE - 1)) + PGSIZE;
+        uint64 split_pa = blk_pa + sizeof(mem_block) + n;
+        if (split_pa + sizeof(mem_block) <= blk_page_end &&
+            blk->size >= n + (int)sizeof(mem_block) + 1) {
+          mem_block *split = (mem_block *)split_pa;
+          split->size = blk->size - n - (int)sizeof(mem_block);
+          split->free = 1;
+          split->next = blk->next;
+          blk->next = split;
+          blk->size = n;
+        }
+        blk->free = 0;
+        return heap_pa_to_va(blk_pa) + sizeof(mem_block);
+      }
+      last_free = blk;
+    }
+    prev = blk;
+    blk = blk->next;
+  }
+
+  if (last_free != NULL && last_free->next == NULL) {
+    int extra = n - last_free->size;
+    int to_add = (extra + PGSIZE - 1) / PGSIZE;
+    if (current->user_heap.heap_pages_cnt + to_add > MAX_HEAP_PAGES)
+      panic("better_malloc: heap too large\n");
+    for (int i = 0; i < to_add; i++) {
+      void *pa = alloc_page();
+      if (!pa)
+        panic("better_malloc: out of memory\n");
+      memset(pa, 0, PGSIZE);
+      uint64 va = current->user_heap.heap_top;
+      current->user_heap.heap_top += PGSIZE;
+      user_vm_map((pagetable_t)current->pagetable, va, PGSIZE, (uint64)pa,
+                  prot_to_type(PROT_WRITE | PROT_READ, 1));
+      int idx = current->user_heap.heap_pages_cnt++;
+      current->user_heap.heap_pages_pa[idx] = (uint64)pa;
+      current->user_heap.heap_pages_va[idx] = va;
+      current->mapped_info[HEAP_SEGMENT].npages++;
+      last_free->size += PGSIZE;
+    }
+    return sys_user_allocate_page(n);
+  }
+
+  int pages_needed = (n + (int)sizeof(mem_block) + PGSIZE - 1) / PGSIZE;
+  mem_block *new_blk = (mem_block *)heap_expand_pages(pages_needed);
+  new_blk->size = pages_needed * PGSIZE - (int)sizeof(mem_block);
+  new_blk->free = 1;
+  new_blk->next = NULL;
+  if (current->user_heap.heap_head == NULL) {
+    current->user_heap.heap_head = new_blk;
+  } else {
+    prev->next = new_blk;
+  }
+  return sys_user_allocate_page(n);
 }
 
 //
 // reclaim a page, indicated by "va". added @lab2_2
 //
 uint64 sys_user_free_page(uint64 va) {
-  user_vm_unmap((pagetable_t)current->pagetable, va, PGSIZE, 1);
-  // add the reclaimed page to the free page list
-  current->user_heap.free_pages_address[current->user_heap.free_pages_count++] =
-      va;
+  uint64 mcb_va = va - sizeof(mem_block);
+  mem_block *blk = (mem_block *)user_va_to_pa((pagetable_t)current->pagetable,
+                                              (void *)mcb_va);
+  if (!blk)
+    panic("better_free: invalid pointer 0x%lx\n", va);
+  blk->free = 1;
+  mem_block *cur = current->user_heap.heap_head;
+  while (cur != NULL && cur->next != NULL) {
+    if (cur->free && cur->next->free) {
+      cur->size += (int)sizeof(mem_block) + cur->next->size;
+      cur->next = cur->next->next;
+    } else {
+      cur = cur->next;
+    }
+  }
   return 0;
 }
 
@@ -229,6 +423,24 @@ ssize_t sys_user_unlink(char *vfn) {
 }
 
 //
+// lib call to read cwd
+//
+ssize_t sys_user_rcwd(char *pathva) {
+  char *pathpa =
+      (char *)user_va_to_pa((pagetable_t)(current->pagetable), (void *)pathva);
+  return do_rcwd(pathpa);
+}
+
+//
+// lib call to change cwd
+//
+ssize_t sys_user_ccwd(char *pathva) {
+  char *pathpa =
+      (char *)user_va_to_pa((pagetable_t)(current->pagetable), (void *)pathva);
+  return do_ccwd(pathpa);
+}
+
+// added @lab4_challenge2
 // kernel entry point of exec. added @lab4_challenge3
 //
 ssize_t sys_user_exec(char *pathva, char *parava) {
@@ -251,6 +463,10 @@ ssize_t sys_user_exec(char *pathva, char *parava) {
 //
 ssize_t sys_user_wait(int pid) { return do_wait(pid); }
 
+ssize_t sys_user_sem_new(int value) { return do_sem_new(value); }
+ssize_t sys_user_sem_P(int sem_id) { return do_sem_P(sem_id); }
+ssize_t sys_user_sem_V(int sem_id) { return do_sem_V(sem_id); }
+
 //
 // [a0]: the syscall number; [a1] ... [a7]: arguments to the syscalls.
 // returns the code of success, (e.g., 0 means success, fail for otherwise)
@@ -264,9 +480,10 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
     return sys_user_exit(a1);
   // added @lab2_2
   case SYS_user_allocate_page:
-    return sys_user_allocate_page();
+    return sys_user_allocate_page((int)a1);
   case SYS_user_free_page:
     return sys_user_free_page(a1);
+
   case SYS_user_fork:
     return sys_user_fork();
   case SYS_user_yield:
@@ -305,6 +522,18 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
     return sys_user_exec((char *)a1, (char *)a2);
   case SYS_user_wait:
     return sys_user_wait((int)a1);
+  case SYS_user_backtrace:
+    return sys_user_backtrace(a1);
+  case SYS_user_sem_new:
+    return sys_user_sem_new((int)a1);
+  case SYS_user_sem_P:
+    return sys_user_sem_P((int)a1);
+  case SYS_user_sem_V:
+    return sys_user_sem_V(a1);
+  case SYS_user_rcwd:
+    return sys_user_rcwd((char *)a1);
+  case SYS_user_ccwd:
+    return sys_user_ccwd((char *)a1);
   default:
     panic("Unknown syscall %ld \n", a0);
   }

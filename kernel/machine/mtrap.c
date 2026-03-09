@@ -1,4 +1,5 @@
 #include "../process.h"
+#include "kernel/config.h"
 #include "kernel/riscv.h"
 #include "spike_interface/spike_utils.h"
 
@@ -23,7 +24,7 @@ static void handle_misaligned_store() {
   sprint("mepc=0x%016lx mtval=0x%016lx sscratch=0x%0lx\n", mepc, mtval,
          sscratch_val);
   sprint("sepc=0x%016lx stval=0x%016lx\n", sepc, stval);
-  extern process *current;
+  // extern process *current; // Removed because current is a macro now
   if (current) {
     sprint("current=%p, pid=%d, trapframe=%p\n", current, current->pid,
            current->trapframe);
@@ -33,7 +34,7 @@ static void handle_misaligned_store() {
 
 // added @lab1_3
 static void handle_timer() {
-  int cpuid = 0;
+  int cpuid = read_csr(mhartid);
   // setup the timer fired at next time (TIMER_INTERVAL from now)
   *(uint64 *)CLINT_MTIMECMP(cpuid) =
       *(uint64 *)CLINT_MTIMECMP(cpuid) + TIMER_INTERVAL;

@@ -107,7 +107,7 @@ void get_path_string(char *path, struct dentry *dentry) {
 //
 struct vinode *hostfs_alloc_vinode(struct super_block *sb) {
   struct vinode *vinode = default_alloc_vinode(sb);
-  vinode->inum = -1; 
+  vinode->inum = -1;
   vinode->i_fs_info = NULL;
   vinode->i_ops = &hostfs_i_ops;
   return vinode;
@@ -120,7 +120,7 @@ int hostfs_write_back_vinode(struct vinode *vinode) { return 0; }
 //
 int hostfs_update_vinode(struct vinode *vinode) {
   spike_file_t *f = vinode->i_fs_info;
-  if ((int64)f < 0) {  // is a direntry
+  if ((int64)f < 0) { // is a direntry
     vinode->type = H_DIR;
     return -1;
   }
@@ -197,7 +197,7 @@ struct vinode *hostfs_lookup(struct vinode *parent, struct dentry *sub_dentry) {
 }
 
 //
-// creates a hostfs file, and establish its vfs inode. 
+// creates a hostfs file, and establish its vfs inode.
 //
 struct vinode *hostfs_create(struct vinode *parent, struct dentry *sub_dentry) {
   char path[MAX_PATH_LEN];
@@ -212,7 +212,8 @@ struct vinode *hostfs_create(struct vinode *parent, struct dentry *sub_dentry) {
   struct vinode *new_inode = hostfs_alloc_vinode(parent->sb);
   new_inode->i_fs_info = f;
 
-  if (hostfs_update_vinode(new_inode) != 0) return NULL;
+  if (hostfs_update_vinode(new_inode) != 0)
+    return NULL;
 
   new_inode->ref = 0;
   return new_inode;
@@ -222,7 +223,7 @@ struct vinode *hostfs_create(struct vinode *parent, struct dentry *sub_dentry) {
 // reposition read/write file offset
 //
 int hostfs_lseek(struct vinode *f_inode, ssize_t new_offset, int whence,
-                  int *offset) {
+                 int *offset) {
   spike_file_t *f = (spike_file_t *)f_inode->i_fs_info;
   if (f < 0) {
     sprint("hostfs_lseek: invalid file handle!\n");
@@ -241,7 +242,8 @@ int hostfs_link(struct vinode *parent, struct dentry *sub_dentry,
   return -1;
 }
 
-int hostfs_unlink(struct vinode *parent, struct dentry *sub_dentry, struct vinode *unlink_node) {
+int hostfs_unlink(struct vinode *parent, struct dentry *sub_dentry,
+                  struct vinode *unlink_node) {
   panic("hostfs_unlink not implemented!\n");
   return -1;
 }
@@ -261,7 +263,8 @@ struct vinode *hostfs_mkdir(struct vinode *parent, struct dentry *sub_dentry) {
 // open a hostfs file (after having its vfs inode).
 //
 int hostfs_hook_open(struct vinode *f_inode, struct dentry *f_dentry) {
-  if (f_inode->i_fs_info != NULL) return 0;
+  if (f_inode->i_fs_info != NULL)
+    return 0;
 
   char path[MAX_PATH_LEN];
   get_path_string(path, f_dentry);

@@ -3,6 +3,7 @@
 
 #include "proc_file.h"
 #include "riscv.h"
+#include "util/types.h"
 
 typedef struct trapframe_t {
   // space to store context (all common registers)
@@ -22,7 +23,14 @@ typedef struct trapframe_t {
 // riscv-pke kernel supports at most 32 processes
 #define NPROC 32
 // maximum number of pages in a process's heap
-#define MAX_HEAP_PAGES 32
+#define MAX_HEAP_PAGES 64
+
+// Memory block structure for Better Malloc
+typedef struct mem_block_t {
+  int size;
+  int free; // 0: free, 1: used
+  struct mem_block_t *next;
+} mem_block;
 
 // possible status of a process
 enum proc_status {
@@ -50,17 +58,16 @@ typedef struct mapped_region {
   uint32 seg_type; // segment type, one of the segment_types
 } mapped_region;
 
-typedef struct process_heap_manager {
-  // points to the last free page in our simple heap.
-  uint64 heap_top;
-  // points to the bottom of our simple heap.
-  uint64 heap_bottom;
+// code file struct, including directory index and file name char pointer
+typedef struct {
+  uint64 dir;
+  char *file;
+} code_file;
 
-  // the address of free pages in the heap
-  uint64 free_pages_address[MAX_HEAP_PAGES];
-  // the number of free pages in the heap
-  uint32 free_pages_count;
-} process_heap_manager;
+// address-line number-file name table
+typedef struct {
+  uint64 addr, line, file;
+} addr_line;
 
 // the extremely simple definition of process, used for begining labs of PKE
 typedef struct process_t {
@@ -79,7 +86,14 @@ typedef struct process_t {
 
   // heap management
   // 用户堆管理
-  process_heap_manager user_heap;
+  struct {
+    uint64 heap_bottom;
+    uint64 heap_top;
+    mem_block *heap_head;
+    uint64 heap_pages_pa[MAX_HEAP_PAGES];
+    uint64 heap_pages_va[MAX_HEAP_PAGES];
+    int heap_pages_cnt;
+  } user_heap;
 
   // process id
   uint64 pid;
@@ -99,6 +113,16 @@ typedef struct process_t {
 
   // file system. added @lab4_1
   proc_file_management *pfiles;
+
+  // app name for backtrace
+  char app_name[128];
+
+  // added @lab1_challenge2
+  char *debugline;
+  char **dir;
+  code_file *file;
+  addr_line *line;
+  int line_ind;
 } process;
 
 // switch to run user app
@@ -119,7 +143,17 @@ int do_exec(char *path, char *para);
 // added @lab4_challenge3
 int do_wait(int pid);
 
-// current running process
-extern process *current;
+// current running process array
+extern process *current_proc[NCPU];
+
+// returns the hartid of the current hart using the tp register (set in
+// mentry.S)
+static inline int get_hartid() {
+  int id;
+  asm volatile("mv %0, tp" : "=r"(id));
+  return id;
+}
+
+#define current (current_proc[get_hartid()])
 
 #endif

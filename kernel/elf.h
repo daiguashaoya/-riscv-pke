@@ -1,8 +1,8 @@
 #ifndef _ELF_H_
 #define _ELF_H_
 
-#include "util/types.h"
 #include "process.h"
+#include "util/types.h"
 
 #define MAX_CMDLINE_ARGS 64
 
@@ -25,10 +25,34 @@ typedef struct elf_header_t {
   uint16 shstrndx;  /* Section header string table index */
 } elf_header;
 
+// Section header
+typedef struct elf_sect_header_t {
+  uint32 name;
+  uint32 type;
+  uint64 flags;
+  uint64 addr;
+  uint64 offset;
+  uint64 size;
+  uint32 link;
+  uint32 info;
+  uint64 addralign;
+  uint64 entsize;
+} elf_sect_header;
+
+// Symbol table entry
+typedef struct elf_sym_t {
+  uint32 name;
+  unsigned char info;
+  unsigned char other;
+  uint16 shndx;
+  uint64 value;
+  uint64 size;
+} elf_sym;
+
 // segment types, attributes of elf_prog_header_t.flags
-#define SEGMENT_READABLE   0x4
+#define SEGMENT_READABLE 0x4
 #define SEGMENT_EXECUTABLE 0x1
-#define SEGMENT_WRITABLE   0x2
+#define SEGMENT_WRITABLE 0x2
 
 // Program segment header.
 typedef struct elf_prog_header_t {
@@ -42,8 +66,21 @@ typedef struct elf_prog_header_t {
   uint64 align;  /* Segment alignment */
 } elf_prog_header;
 
-#define ELF_MAGIC 0x464C457FU  // "\x7FELF" in little endian
+#define ELF_MAGIC 0x464C457FU // "\x7FELF" in little endian
 #define ELF_PROG_LOAD 1
+
+// compilation units header (in debug line section)
+typedef struct __attribute__((packed)) {
+  uint32 length;
+  uint16 version;
+  uint32 header_length;
+  uint8 min_instruction_length;
+  uint8 default_is_stmt;
+  int8 line_base;
+  uint8 line_range;
+  uint8 opcode_base;
+  uint8 std_opcode_lengths[12];
+} debug_header;
 
 typedef enum elf_status_t {
   EL_OK = 0,

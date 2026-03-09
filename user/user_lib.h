@@ -11,6 +11,8 @@ int printu(const char *s, ...);
 int exit(int code);
 void *naive_malloc();
 void naive_free(void *va);
+void *better_malloc(int n);
+void better_free(void *va);
 int fork();
 void yield();
 
@@ -36,5 +38,14 @@ int unlink_u(const char *fn);
 // added @ lab4_challenge3
 int exec(const char *path, const char *para);
 int wait(int pid);
+void print_backtrace(int depth);
+
+// Lab 3 / Lab 4 Challenge Stubs
+int sem_new(int val);
+void sem_P(int sem_id);
+void sem_V(int sem_id);
+void printpa(int *vadr);
+int read_cwd(char *path);
+int change_cwd(const char *path);
 
 #endif

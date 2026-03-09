@@ -99,6 +99,9 @@ USER_O_CPPS 		:= user/app_echo.c user/user_lib.c
 USER_O_OBJS  		:= $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_O_CPPS)))
 
 USER_O_TARGET 	:= $(HOSTFS_ROOT)/bin/app_echo
+
+CHAL_TARGETS := $(HOSTFS_ROOT)/bin/app_print_backtrace $(HOSTFS_ROOT)/bin/app_errorline $(HOSTFS_ROOT)/bin/app0 $(HOSTFS_ROOT)/bin/app1 $(HOSTFS_ROOT)/bin/app_sum_sequence $(HOSTFS_ROOT)/bin/app_singlepageheap $(HOSTFS_ROOT)/bin/app_alloc0 $(HOSTFS_ROOT)/bin/app_alloc1 $(HOSTFS_ROOT)/bin/app_wait $(HOSTFS_ROOT)/bin/app_semaphore $(HOSTFS_ROOT)/bin/app_cow $(HOSTFS_ROOT)/bin/app_relativepath $(HOSTFS_ROOT)/bin/app_exec
+
 #------------------------targets------------------------
 $(OBJ_DIR):
 	@-mkdir -p $(OBJ_DIR)	
@@ -177,12 +180,12 @@ $(USER_O_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_O_OBJS)
 
 .DEFAULT_GOAL := $(all)
 
-all: $(KERNEL_TARGET) $(USER_TARGET) $(USER_E_TARGET) $(USER_M_TARGET) $(USER_T_TARGET) $(USER_C_TARGET) $(USER_O_TARGET)
+all: $(KERNEL_TARGET) $(CHAL_TARGETS) $(USER_TARGET) $(USER_E_TARGET) $(USER_M_TARGET) $(USER_T_TARGET) $(USER_C_TARGET) $(USER_O_TARGET)
 .PHONY:all
 
-run: $(KERNEL_TARGET) $(USER_TARGET) $(USER_E_TARGET) $(USER_M_TARGET) $(USER_T_TARGET) $(USER_C_TARGET) $(USER_O_TARGET)
+run: $(KERNEL_TARGET) $(CHAL_TARGETS) $(USER_TARGET) $(USER_E_TARGET) $(USER_M_TARGET) $(USER_T_TARGET) $(USER_C_TARGET) $(USER_O_TARGET)
 	@echo "********************HUST PKE********************"
-	spike $(KERNEL_TARGET) /bin/app_shell
+	spike -p2 $(KERNEL_TARGET) /bin/app_shell
 
 # need openocd!
 gdb:$(KERNEL_TARGET) $(USER_TARGET)
@@ -213,4 +216,125 @@ format:
 	@python ./format.py ./
 
 clean:
-	rm -fr ${OBJ_DIR} ${HOSTFS_ROOT}/bin
+	rm -fr ${OBJ_DIR} ${HOSTFS_ROOT}/bin $(CHAL_TARGETS)
+
+# -------- CHALLENGE APPS --------
+USER_PRINT_BACKTRACE_CPPS := user/app_print_backtrace.c user/user_lib.c
+USER_PRINT_BACKTRACE_OBJS := $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_PRINT_BACKTRACE_CPPS)))
+USER_PRINT_BACKTRACE_TARGET := $(HOSTFS_ROOT)/bin/app_print_backtrace
+
+USER_ERRORLINE_CPPS := user/app_errorline.c user/user_lib.c
+USER_ERRORLINE_OBJS := $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_ERRORLINE_CPPS)))
+USER_ERRORLINE_TARGET := $(HOSTFS_ROOT)/bin/app_errorline
+
+USER_APP0_CPPS := user/app0.c user/user_lib.c
+USER_APP0_OBJS := $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_APP0_CPPS)))
+USER_APP0_TARGET := $(HOSTFS_ROOT)/bin/app0
+
+USER_APP1_CPPS := user/app1.c user/user_lib.c
+USER_APP1_OBJS := $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_APP1_CPPS)))
+USER_APP1_TARGET := $(HOSTFS_ROOT)/bin/app1
+
+USER_SUM_SEQUENCE_CPPS := user/app_sum_sequence.c user/user_lib.c
+USER_SUM_SEQUENCE_OBJS := $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_SUM_SEQUENCE_CPPS)))
+USER_SUM_SEQUENCE_TARGET := $(HOSTFS_ROOT)/bin/app_sum_sequence
+
+USER_SINGLEPAGEHEAP_CPPS := user/app_singlepageheap.c user/user_lib.c
+USER_SINGLEPAGEHEAP_OBJS := $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_SINGLEPAGEHEAP_CPPS)))
+USER_SINGLEPAGEHEAP_TARGET := $(HOSTFS_ROOT)/bin/app_singlepageheap
+
+USER_ALLOC0_CPPS := user/app_alloc0.c user/user_lib.c
+USER_ALLOC0_OBJS := $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_ALLOC0_CPPS)))
+USER_ALLOC0_TARGET := $(HOSTFS_ROOT)/bin/app_alloc0
+
+USER_ALLOC1_CPPS := user/app_alloc1.c user/user_lib.c
+USER_ALLOC1_OBJS := $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_ALLOC1_CPPS)))
+USER_ALLOC1_TARGET := $(HOSTFS_ROOT)/bin/app_alloc1
+
+USER_WAIT_CPPS := user/app_wait.c user/user_lib.c
+USER_WAIT_OBJS := $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_WAIT_CPPS)))
+USER_WAIT_TARGET := $(HOSTFS_ROOT)/bin/app_wait
+
+USER_SEMAPHORE_CPPS := user/app_semaphore.c user/user_lib.c
+USER_SEMAPHORE_OBJS := $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_SEMAPHORE_CPPS)))
+USER_SEMAPHORE_TARGET := $(HOSTFS_ROOT)/bin/app_semaphore
+
+USER_COW_CPPS := user/app_cow.c user/user_lib.c
+USER_COW_OBJS := $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_COW_CPPS)))
+USER_COW_TARGET := $(HOSTFS_ROOT)/bin/app_cow
+
+USER_RELATIVEPATH_CPPS := user/app_relativepath.c user/user_lib.c
+USER_RELATIVEPATH_OBJS := $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_RELATIVEPATH_CPPS)))
+USER_RELATIVEPATH_TARGET := $(HOSTFS_ROOT)/bin/app_relativepath
+
+USER_EXEC_CPPS := user/app_exec.c user/user_lib.c
+USER_EXEC_OBJS := $(addprefix $(OBJ_DIR)/, $(patsubst %.c,%.o,$(USER_EXEC_CPPS)))
+USER_EXEC_TARGET := $(HOSTFS_ROOT)/bin/app_exec
+
+CHAL_TARGETS := $(USER_PRINT_BACKTRACE_TARGET) $(USER_ERRORLINE_TARGET) $(USER_APP0_TARGET) $(USER_APP1_TARGET) $(USER_SUM_SEQUENCE_TARGET) $(USER_SINGLEPAGEHEAP_TARGET) $(USER_ALLOC0_TARGET) $(USER_ALLOC1_TARGET) $(USER_WAIT_TARGET) $(USER_SEMAPHORE_TARGET) $(USER_COW_TARGET) $(USER_RELATIVEPATH_TARGET) $(USER_EXEC_TARGET)
+
+$(USER_PRINT_BACKTRACE_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_PRINT_BACKTRACE_OBJS)
+	@echo "linking" $@ ...
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_PRINT_BACKTRACE_OBJS) $(UTIL_LIB) -o $@
+
+$(USER_ERRORLINE_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_ERRORLINE_OBJS)
+	@echo "linking" $@ ...
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_ERRORLINE_OBJS) $(UTIL_LIB) -o $@
+
+$(USER_APP0_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_APP0_OBJS)
+	@echo "linking" $@ ...
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_APP0_OBJS) $(UTIL_LIB) -o $@
+
+$(USER_APP1_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_APP1_OBJS)
+	@echo "linking" $@ ...
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_APP1_OBJS) $(UTIL_LIB) -o $@
+
+$(USER_SUM_SEQUENCE_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_SUM_SEQUENCE_OBJS)
+	@echo "linking" $@ ...
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_SUM_SEQUENCE_OBJS) $(UTIL_LIB) -o $@
+
+$(USER_SINGLEPAGEHEAP_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_SINGLEPAGEHEAP_OBJS)
+	@echo "linking" $@ ...
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_SINGLEPAGEHEAP_OBJS) $(UTIL_LIB) -o $@
+
+$(USER_ALLOC0_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_ALLOC0_OBJS)
+	@echo "linking" $@ ...
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_ALLOC0_OBJS) $(UTIL_LIB) -o $@
+
+$(USER_ALLOC1_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_ALLOC1_OBJS)
+	@echo "linking" $@ ...
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_ALLOC1_OBJS) $(UTIL_LIB) -o $@
+
+$(USER_WAIT_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_WAIT_OBJS)
+	@echo "linking" $@ ...
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_WAIT_OBJS) $(UTIL_LIB) -o $@
+
+$(USER_SEMAPHORE_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_SEMAPHORE_OBJS)
+	@echo "linking" $@ ...
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_SEMAPHORE_OBJS) $(UTIL_LIB) -o $@
+
+$(USER_COW_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_COW_OBJS)
+	@echo "linking" $@ ...
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_COW_OBJS) $(UTIL_LIB) -o $@
+
+$(USER_RELATIVEPATH_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_RELATIVEPATH_OBJS)
+	@echo "linking" $@ ...
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_RELATIVEPATH_OBJS) $(UTIL_LIB) -o $@
+
+$(USER_EXEC_TARGET): $(OBJ_DIR) $(UTIL_LIB) $(USER_EXEC_OBJS)
+	@echo "linking" $@ ...
+	-@mkdir -p $(HOSTFS_ROOT)/bin
+	@$(COMPILE) --entry=main $(USER_EXEC_OBJS) $(UTIL_LIB) -o $@
+
