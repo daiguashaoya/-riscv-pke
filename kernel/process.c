@@ -186,6 +186,7 @@ int free_process(process *proc) {
 
   // if the parent process is waiting for this child, wake it up. added
   // @lab4_challenge3
+  // 检查父进程是否在等待这个子进程
   if (proc->parent != NULL && proc->parent->status == BLOCKED &&
       proc->parent->waiting_for_pid == (int)proc->pid) {
     proc->parent->waiting_for_pid = -1;
