@@ -21,7 +21,7 @@ ifneq (,)
   mabi := -mabi=$(if $(is_32bit),ilp32,lp64)
 endif
 
-CFLAGS        := -Wall -Werror  -fno-builtin -nostdlib -D__NO_INLINE__ -mcmodel=medany -g -Og -std=gnu99 -Wno-unused -Wno-attributes -fno-delete-null-pointer-checks -fno-PIE -fno-omit-frame-pointer $(march)
+CFLAGS        := -Wall -Werror  -fno-builtin -nostdlib -D__NO_INLINE__ -mcmodel=medany -g -gdwarf-2 -Og -std=gnu99 -Wno-unused -Wno-attributes -fno-delete-null-pointer-checks -fno-PIE -fno-omit-frame-pointer $(march)
 COMPILE       	:= $(CC) -MMD -MP $(CFLAGS) $(SPROJS_INCLUDE)
 
 #---------------------	utils -----------------------
@@ -70,6 +70,7 @@ USER_LIB_OBJ := $(OBJ_DIR)/user/user_lib.o
 # only include apps whose required user-lib/syscalls exist in this branch
 SUPPORTED_USER_APPS := \
 	app_print_backtrace \
+	app_errorline \
 # 	app_shell \
 # 	app_ls \
 # 	app_mkdir \
@@ -79,7 +80,7 @@ SUPPORTED_USER_APPS := \
 
 # 	app_sum_sequence \
 # 	app_wait \
-# 	app_errorline \
+
 # 	app0 \
 # 	app1 \
 # 	app_alloc0 \

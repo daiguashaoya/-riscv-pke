@@ -85,6 +85,18 @@ typedef struct elf_ctx_t {
   elf_header ehdr;
 } elf_ctx;
 
+typedef struct __attribute__((packed)) {
+    uint32 length;
+    uint16 version;
+    uint32 header_length;
+    uint8 min_instruction_length;
+    uint8 default_is_stmt;
+    int8 line_base;
+    uint8 line_range;
+    uint8 opcode_base;
+    uint8 std_opcode_lengths[12];
+} debug_header;
+
 elf_status elf_init(elf_ctx *ctx, void *info);
 elf_status elf_load(elf_ctx *ctx);
 
