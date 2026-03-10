@@ -191,7 +191,8 @@ int free_process(process *proc) {
   // @lab4_challenge3
   // 检查父进程是否在等待这个子进程
   if (proc->parent != NULL && proc->parent->status == BLOCKED &&
-      proc->parent->waiting_for_pid == (int)proc->pid) {
+      (proc->parent->waiting_for_pid == -1 ||
+       proc->parent->waiting_for_pid == (int)proc->pid)) {
     proc->parent->waiting_for_pid = -1;
     insert_to_ready_queue(proc->parent);
   }
@@ -393,29 +394,34 @@ int do_exec(char *path, char *para) {
 // added @lab4_challenge3
 //
 int do_wait(int pid) {
-  // find the target child process
-  process *child = NULL;
-  for (int i = 0; i < NPROC; i++) {
-    if ((int)procs[i].pid == pid && procs[i].parent == current) {
-      child = &procs[i];
-      break;
-    }
-  }
-  if (child == NULL)
+  if (pid != -1 && pid <= 0)
     return -1;
 
-  // if child already exited, return immediately
-  if (child->status == ZOMBIE) {
-    child->status = FREE;
-    return pid;
+  while (1) {
+    int has_child = 0;
+
+    for (int i = 0; i < NPROC; i++) {
+      if (procs[i].parent != current)
+        continue;
+      if (pid != -1 && (int)procs[i].pid != pid)
+        continue;
+
+      has_child = 1;
+      if (procs[i].status == ZOMBIE) {
+        int child_pid = (int)procs[i].pid;
+        procs[i].status = FREE;
+        current->waiting_for_pid = -1;
+        return child_pid;
+      }
+    }
+
+    // waiting target does not exist
+    if (!has_child)
+      return -1;
+
+    // block until one target child exits
+    current->waiting_for_pid = pid; // pid or -1(any child)
+    current->status = BLOCKED;
+    schedule();
   }
-
-  // block current process and wait for child to exit
-  current->waiting_for_pid = pid;
-  current->status = BLOCKED;
-  schedule(); // switch to another process; free_process() will re-queue us
-
-  // child has exited; reclaim its process slot
-  child->status = FREE;
-  return pid;
 }

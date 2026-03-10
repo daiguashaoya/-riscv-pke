@@ -73,7 +73,8 @@ SUPPORTED_USER_APPS := \
 	app_errorline \
 	app_sum_sequence \
 	app_singlepageheap \
-	
+	app_wait \
+
 # 	app_shell \
 # 	app_ls \
 # 	app_mkdir \
@@ -82,7 +83,7 @@ SUPPORTED_USER_APPS := \
 # 	app_echo \
 
 
-# 	app_wait \
+
 
 # 	app0 \
 # 	app1 \
