@@ -1,0 +1,492 @@
+HTIF is available!
+(Emulated) memory size: 2048 MB
+In m_start, hartid:0
+hartid = 0: Enter supervisor mode...
+PKE kernel start 0x0000000080000000, PKE kernel end: 0x000000008005e000, PKE kernel size: 0x000000000005e000 .
+free physical memory address: [0x000000008005e000, 0x0000000087ffffff] 
+kernel memory manager is initializing ...
+In m_start, hartid:1
+hartid = 1: Enter supervisor mode...
+KERN_BASE 0x0000000080000000
+physical address of _etext is: 0x000000008000c000
+kernel page table is on 
+RAMDISK0: base address of RAMDISK0 is: 0x0000000087f35000
+RFS: format RAMDISK0 done!
+Switch to user mode...
+in alloc_proc. user frame 0x0000000087f29000, user stack 0x000000007ffff000, user kstack 0x0000000087f28000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+hartid = 0: User application is loading.
+Application: /bin/app_shell
+CODE_SEGMENT added at mapped info offset:4
+DATA_SEGMENT added at mapped info offset:5
+Application program entry point (virtual address): 0x00000000000100b0
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+
+======== Shell Start ========
+
+Next command: /bin/app_print_backtrace none
+
+==========Command Start============
+
+User call fork.
+will fork a child from parent 0.
+in alloc_proc. user frame 0x0000000087f0e000, user stack 0x000000007ffff000, user kstack 0x0000000087f0c000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+fork dbg: parent=0 data_va=0000000000011000 data_pa=0000000087f10000 ref_before=1
+fork dbg: parent=0 data_va=0000000000011000 data_pa=0000000087f10000 ref_after=2
+going to insert process 1 to ready queue.
+going to schedule process 1 to run.
+exec dbg: pid=1 unmap CODE va=0000000000010000 pa=0000000087f13000 ref_before=1
+exec dbg: pid=1 unmap CODE va=0000000000010000 pa=0000000087f13000 ref_after=1
+exec dbg: pid=1 unmap DATA va=0000000000011000 pa=0000000087f10000 ref_before=2
+exec dbg: pid=1 unmap DATA va=0000000000011000 pa=0000000087f10000 ref_after=1
+Application: /bin/app_print_backtrace
+CODE_SEGMENT added at mapped info offset:4
+Application program entry point (virtual address): 0x000000000001011a
+back trace the user app in the following:
+f8
+f7
+f6
+f5
+f4
+f3
+f2
+User exit with code:0.
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+==========Command End============
+
+handle_page_fault: 0000000000011c68
+COW dbg: pid=0 stval=0000000000011c68 old_pa=0000000087f10000 new_pa=0000000087efc000 old_ref=1 old_pte=0000000021fc415b new_pte=0000000021fbf0df code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000011c68 old_ref_after=0 code_pte_after=0000000021fc4cdf
+handle_page_fault: 0000000000400000
+COW dbg: pid=0 stval=0000000000400000 old_pa=0000000087f17000 new_pa=0000000087f10000 old_ref=1 old_pte=0000000021fc5d53 new_pte=0000000021fc40d7 code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000400000 old_ref_after=0 code_pte_after=0000000021fc4cdf
+handle_page_fault: 0000000000401000
+COW dbg: pid=0 stval=0000000000401000 old_pa=0000000087f19000 new_pa=0000000087f17000 old_ref=1 old_pte=0000000021fc6553 new_pte=0000000021fc5cd7 code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000401000 old_ref_after=0 code_pte_after=0000000021fc4cdf
+Next command: /bin/app_errorline none
+
+==========Command Start============
+
+User call fork.
+will fork a child from parent 0.
+in alloc_proc. user frame 0x0000000087f19000, user stack 0x000000007ffff000, user kstack 0x0000000087eff000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+fork dbg: parent=0 data_va=0000000000011000 data_pa=0000000087efc000 ref_before=1
+fork dbg: parent=0 data_va=0000000000011000 data_pa=0000000087efc000 ref_after=2
+going to insert process 2 to ready queue.
+going to schedule process 2 to run.
+exec dbg: pid=2 unmap CODE va=0000000000010000 pa=0000000087f13000 ref_before=1
+exec dbg: pid=2 unmap CODE va=0000000000010000 pa=0000000087f13000 ref_after=1
+exec dbg: pid=2 unmap DATA va=0000000000011000 pa=0000000087efc000 ref_before=2
+exec dbg: pid=2 unmap DATA va=0000000000011000 pa=0000000087efc000 ref_after=1
+Application: /bin/app_errorline
+CODE_SEGMENT added at mapped info offset:4
+Application program entry point (virtual address): 0x0000000000010078
+Going to hack the system by running privilege instructions.
+Runtime error at user/app_errorline.c:13
+    asm volatile("csrw sscratch, 0");
+Illegal instruction!
+User exit with code:-1.
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+==========Command End============
+
+handle_page_fault: 0000000000011c68
+COW dbg: pid=0 stval=0000000000011c68 old_pa=0000000087efc000 new_pa=0000000087ee9000 old_ref=1 old_pte=0000000021fbf15b new_pte=0000000021fba4df code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000011c68 old_ref_after=0 code_pte_after=0000000021fc4cdf
+handle_page_fault: 0000000000400000
+COW dbg: pid=0 stval=0000000000400000 old_pa=0000000087f10000 new_pa=0000000087efc000 old_ref=1 old_pte=0000000021fc4153 new_pte=0000000021fbf0d7 code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000400000 old_ref_after=0 code_pte_after=0000000021fc4cdf
+handle_page_fault: 0000000000401000
+COW dbg: pid=0 stval=0000000000401000 old_pa=0000000087f17000 new_pa=0000000087f10000 old_ref=1 old_pte=0000000021fc5d53 new_pte=0000000021fc40d7 code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000401000 old_ref_after=0 code_pte_after=0000000021fc4cdf
+Next command: /bin/app_sum_sequence none
+
+==========Command Start============
+
+User call fork.
+will fork a child from parent 0.
+in alloc_proc. user frame 0x0000000087f17000, user stack 0x000000007ffff000, user kstack 0x0000000087eeb000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+fork dbg: parent=0 data_va=0000000000011000 data_pa=0000000087ee9000 ref_before=1
+fork dbg: parent=0 data_va=0000000000011000 data_pa=0000000087ee9000 ref_after=2
+going to insert process 3 to ready queue.
+going to schedule process 3 to run.
+exec dbg: pid=3 unmap CODE va=0000000000010000 pa=0000000087f13000 ref_before=1
+exec dbg: pid=3 unmap CODE va=0000000000010000 pa=0000000087f13000 ref_after=1
+exec dbg: pid=3 unmap DATA va=0000000000011000 pa=0000000087ee9000 ref_before=2
+exec dbg: pid=3 unmap DATA va=0000000000011000 pa=0000000087ee9000 ref_after=1
+Application: /bin/app_sum_sequence
+CODE_SEGMENT added at mapped info offset:4
+Application program entry point (virtual address): 0x00000000000100aa
+handle_page_fault: 000000007fffdff8
+handle_page_fault: 000000007fffcff8
+handle_page_fault: 000000007fffbff8
+handle_page_fault: 000000007fffaff8
+handle_page_fault: 000000007fff9ff8
+handle_page_fault: 000000007fff8ff8
+handle_page_fault: 000000007fff7ff8
+handle_page_fault: 000000007fff6ff8
+handle_page_fault: 0000000000401000
+COW dbg: pid=3 stval=0000000000401000 old_pa=0000000087f10000 new_pa=0000000087ecb000 old_ref=1 old_pte=0000000021fc4152 new_pte=0000000021fb2cd6 code_pte_before=0000000021fb44df
+COW dbg: pid=3 stval=0000000000401000 old_ref_after=0 code_pte_after=0000000021fb44df
+handle_page_fault: 0000000000401000
+this address is not available!
+User exit with code:-1.
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+==========Command End============
+
+handle_page_fault: 0000000000011c68
+COW dbg: pid=0 stval=0000000000011c68 old_pa=0000000087ee9000 new_pa=0000000087f10000 old_ref=1 old_pte=0000000021fba55b new_pte=0000000021fc40df code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000011c68 old_ref_after=0 code_pte_after=0000000021fc4cdf
+handle_page_fault: 0000000000400000
+COW dbg: pid=0 stval=0000000000400000 old_pa=0000000087efc000 new_pa=0000000087ee9000 old_ref=1 old_pte=0000000021fbf153 new_pte=0000000021fba4d7 code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000400000 old_ref_after=0 code_pte_after=0000000021fc4cdf
+handle_page_fault: 0000000000401000
+COW dbg: pid=0 stval=0000000000401000 old_pa=0000000087f10000 new_pa=0000000087efc000 old_ref=1 old_pte=0000000021fc4153 new_pte=0000000021fbf0d7 code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000401000 old_ref_after=0 code_pte_after=0000000021fc4cdf
+Next command: /bin/app_singlepageheap none
+
+==========Command Start============
+
+User call fork.
+will fork a child from parent 0.
+in alloc_proc. user frame 0x0000000087f10000, user stack 0x000000007ffff000, user kstack 0x0000000087eca000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+fork dbg: parent=0 data_va=0000000000011000 data_pa=0000000087f10000 ref_before=1
+fork dbg: parent=0 data_va=0000000000011000 data_pa=0000000087f10000 ref_after=2
+going to insert process 4 to ready queue.
+going to schedule process 4 to run.
+exec dbg: pid=4 unmap CODE va=0000000000010000 pa=0000000087f13000 ref_before=1
+exec dbg: pid=4 unmap CODE va=0000000000010000 pa=0000000087f13000 ref_after=1
+exec dbg: pid=4 unmap DATA va=0000000000011000 pa=0000000087f10000 ref_before=2
+exec dbg: pid=4 unmap DATA va=0000000000011000 pa=0000000087f10000 ref_after=1
+Application: /bin/app_singlepageheap
+CODE_SEGMENT added at mapped info offset:4
+DATA_SEGMENT added at mapped info offset:5
+Application program entry point (virtual address): 0x00000000000100b0
+cross page
+User exit with code:0.
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+==========Command End============
+
+handle_page_fault: 0000000000011c68
+COW dbg: pid=0 stval=0000000000011c68 old_pa=0000000087f10000 new_pa=0000000087ebd000 old_ref=1 old_pte=0000000021fc415b new_pte=0000000021faf4df code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000011c68 old_ref_after=0 code_pte_after=0000000021fc4cdf
+handle_page_fault: 0000000000400000
+COW dbg: pid=0 stval=0000000000400000 old_pa=0000000087ee9000 new_pa=0000000087f10000 old_ref=1 old_pte=0000000021fba553 new_pte=0000000021fc40d7 code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000400000 old_ref_after=0 code_pte_after=0000000021fc4cdf
+handle_page_fault: 0000000000401000
+COW dbg: pid=0 stval=0000000000401000 old_pa=0000000087efc000 new_pa=0000000087ee9000 old_ref=1 old_pte=0000000021fbf153 new_pte=0000000021fba4d7 code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000401000 old_ref_after=0 code_pte_after=0000000021fc4cdf
+Next command: /bin/app_wait none
+
+==========Command Start============
+
+User call fork.
+will fork a child from parent 0.
+in alloc_proc. user frame 0x0000000087efc000, user stack 0x000000007ffff000, user kstack 0x0000000087eb5000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+fork dbg: parent=0 data_va=0000000000011000 data_pa=0000000087ebd000 ref_before=1
+fork dbg: parent=0 data_va=0000000000011000 data_pa=0000000087ebd000 ref_after=2
+going to insert process 5 to ready queue.
+going to schedule process 5 to run.
+exec dbg: pid=5 unmap CODE va=0000000000010000 pa=0000000087f13000 ref_before=1
+exec dbg: pid=5 unmap CODE va=0000000000010000 pa=0000000087f13000 ref_after=1
+exec dbg: pid=5 unmap DATA va=0000000000011000 pa=0000000087ebd000 ref_before=2
+exec dbg: pid=5 unmap DATA va=0000000000011000 pa=0000000087ebd000 ref_after=1
+Application: /bin/app_wait
+CODE_SEGMENT added at mapped info offset:4
+DATA_SEGMENT added at mapped info offset:5
+Application program entry point (virtual address): 0x00000000000100b0
+User call fork.
+will fork a child from parent 5.
+in alloc_proc. user frame 0x0000000087ea7000, user stack 0x000000007ffff000, user kstack 0x0000000087ea9000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087ea1000 of parent to child at va:0000000000010000.
+going to insert process 6 to ready queue.
+going to schedule process 6 to run.
+handle_page_fault: 00000000000118d0
+User call fork.
+will fork a child from parent 6.
+in alloc_proc. user frame 0x0000000087e95000, user stack 0x000000007ffff000, user kstack 0x0000000087e94000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087ea1000 of parent to child at va:0000000000010000.
+going to insert process 7 to ready queue.
+going to schedule process 7 to run.
+handle_page_fault: 00000000000118d0
+Grandchild process end, flag = 2.
+User exit with code:0.
+going to insert process 6 to ready queue.
+going to schedule process 6 to run.
+Child process end, flag = 1.
+User exit with code:0.
+going to insert process 5 to ready queue.
+going to schedule process 5 to run.
+Parent process end, flag = 0.
+User exit with code:0.
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+==========Command End============
+
+handle_page_fault: 0000000000011c68
+COW dbg: pid=0 stval=0000000000011c68 old_pa=0000000087ebd000 new_pa=0000000087e87000 old_ref=1 old_pte=0000000021faf55b new_pte=0000000021fa1cdf code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000011c68 old_ref_after=0 code_pte_after=0000000021fc4cdf
+handle_page_fault: 0000000000400000
+COW dbg: pid=0 stval=0000000000400000 old_pa=0000000087f10000 new_pa=0000000087ebd000 old_ref=1 old_pte=0000000021fc4153 new_pte=0000000021faf4d7 code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000400000 old_ref_after=0 code_pte_after=0000000021fc4cdf
+handle_page_fault: 0000000000401000
+COW dbg: pid=0 stval=0000000000401000 old_pa=0000000087ee9000 new_pa=0000000087f10000 old_ref=1 old_pte=0000000021fba553 new_pte=0000000021fc40d7 code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000401000 old_ref_after=0 code_pte_after=0000000021fc4cdf
+Next command: /bin/app_semaphore none
+
+==========Command Start============
+
+User call fork.
+will fork a child from parent 0.
+in alloc_proc. user frame 0x0000000087ee9000, user stack 0x000000007ffff000, user kstack 0x0000000087e86000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+fork dbg: parent=0 data_va=0000000000011000 data_pa=0000000087e87000 ref_before=1
+fork dbg: parent=0 data_va=0000000000011000 data_pa=0000000087e87000 ref_after=2
+going to insert process 8 to ready queue.
+going to schedule process 8 to run.
+exec dbg: pid=8 unmap CODE va=0000000000010000 pa=0000000087f13000 ref_before=1
+exec dbg: pid=8 unmap CODE va=0000000000010000 pa=0000000087f13000 ref_after=1
+exec dbg: pid=8 unmap DATA va=0000000000011000 pa=0000000087e87000 ref_before=2
+exec dbg: pid=8 unmap DATA va=0000000000011000 pa=0000000087e87000 ref_after=1
+Application: /bin/app_semaphore
+CODE_SEGMENT added at mapped info offset:4
+Application program entry point (virtual address): 0x0000000000010078
+User call fork.
+will fork a child from parent 8.
+in alloc_proc. user frame 0x0000000087e78000, user stack 0x000000007ffff000, user kstack 0x0000000087e7a000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087e72000 of parent to child at va:0000000000010000.
+going to insert process 9 to ready queue.
+going to insert process 8 to ready queue.
+going to schedule process 9 to run.
+going to schedule process 8 to run.
+User call fork.
+will fork a child from parent 8.
+in alloc_proc. user frame 0x0000000087e68000, user stack 0x000000007ffff000, user kstack 0x0000000087e67000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087e72000 of parent to child at va:0000000000010000.
+going to insert process 10 to ready queue.
+going to insert process 8 to ready queue.
+going to schedule process 10 to run.
+going to schedule process 8 to run.
+User call fork.
+will fork a child from parent 8.
+in alloc_proc. user frame 0x0000000087e5b000, user stack 0x000000007ffff000, user kstack 0x0000000087e5a000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087e72000 of parent to child at va:0000000000010000.
+going to insert process 11 to ready queue.
+going to insert process 8 to ready queue.
+going to schedule process 11 to run.
+going to schedule process 8 to run.
+semaphore 0 value: -3
+ wait queue: 9  10  11  
+going to insert process 9 to ready queue.
+going to insert process 8 to ready queue.
+going to schedule process 9 to run.
+Child 1 woke up
+User exit with code:0.
+going to schedule process 8 to run.
+semaphore 0 value: -2
+ wait queue: 10  11  
+going to insert process 10 to ready queue.
+going to insert process 8 to ready queue.
+going to schedule process 10 to run.
+Child 2 woke up
+User exit with code:0.
+going to schedule process 8 to run.
+semaphore 0 value: -1
+ wait queue: 11  
+going to insert process 11 to ready queue.
+going to insert process 8 to ready queue.
+going to schedule process 11 to run.
+Child 3 woke up
+User exit with code:0.
+going to schedule process 8 to run.
+User exit with code:0.
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+==========Command End============
+
+handle_page_fault: 0000000000011c68
+COW dbg: pid=0 stval=0000000000011c68 old_pa=0000000087e87000 new_pa=0000000087e4e000 old_ref=1 old_pte=0000000021fa1d5b new_pte=0000000021f938df code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000011c68 old_ref_after=0 code_pte_after=0000000021fc4cdf
+handle_page_fault: 0000000000400000
+COW dbg: pid=0 stval=0000000000400000 old_pa=0000000087ebd000 new_pa=0000000087e87000 old_ref=1 old_pte=0000000021faf553 new_pte=0000000021fa1cd7 code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000400000 old_ref_after=0 code_pte_after=0000000021fc4cdf
+handle_page_fault: 0000000000401000
+COW dbg: pid=0 stval=0000000000401000 old_pa=0000000087f10000 new_pa=0000000087ebd000 old_ref=1 old_pte=0000000021fc4153 new_pte=0000000021faf4d7 code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000401000 old_ref_after=0 code_pte_after=0000000021fc4cdf
+Next command: /bin/app_cow none
+
+==========Command Start============
+
+User call fork.
+will fork a child from parent 0.
+in alloc_proc. user frame 0x0000000087f10000, user stack 0x000000007ffff000, user kstack 0x0000000087e4d000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+fork dbg: parent=0 data_va=0000000000011000 data_pa=0000000087e4e000 ref_before=1
+fork dbg: parent=0 data_va=0000000000011000 data_pa=0000000087e4e000 ref_after=2
+going to insert process 12 to ready queue.
+going to schedule process 12 to run.
+exec dbg: pid=12 unmap CODE va=0000000000010000 pa=0000000087f13000 ref_before=1
+exec dbg: pid=12 unmap CODE va=0000000000010000 pa=0000000087f13000 ref_after=1
+exec dbg: pid=12 unmap DATA va=0000000000011000 pa=0000000087e4e000 ref_before=2
+exec dbg: pid=12 unmap DATA va=0000000000011000 pa=0000000087e4e000 ref_after=1
+Application: /bin/app_cow
+CODE_SEGMENT added at mapped info offset:4
+Application program entry point (virtual address): 0x0000000000010078
+the physical address of parent process heap is: User call fork.
+will fork a child from parent 12.
+in alloc_proc. user frame 0x0000000087e3d000, user stack 0x000000007ffff000, user kstack 0x0000000087e3c000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087e39000 of parent to child at va:0000000000010000.
+going to insert process 13 to ready queue.
+User exit with code:0.
+going to insert process 0 to ready queue.
+going to schedule process 13 to run.
+the physical address of child process heap before copy on write is: handle_page_fault: 0000000000400000
+COW dbg: pid=13 stval=0000000000400000 old_pa=0000000087e3f000 new_pa=0000000087e2d000 old_ref=2 old_pte=0000000021f8fd53 new_pte=0000000021f8b4d7 code_pte_before=0000000021f8e45b
+COW dbg: pid=13 stval=0000000000400000 old_ref_after=1 code_pte_after=0000000021f8e45b
+the physical address of child process heap after copy on write is: User exit with code:0.
+going to schedule process 0 to run.
+==========Command End============
+
+handle_page_fault: 0000000000011c68
+COW dbg: pid=0 stval=0000000000011c68 old_pa=0000000087e4e000 new_pa=0000000087e2c000 old_ref=1 old_pte=0000000021f9395b new_pte=0000000021f8b0df code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000011c68 old_ref_after=0 code_pte_after=0000000021fc4cdf
+handle_page_fault: 0000000000400000
+COW dbg: pid=0 stval=0000000000400000 old_pa=0000000087e87000 new_pa=0000000087e4e000 old_ref=1 old_pte=0000000021fa1d53 new_pte=0000000021f938d7 code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000400000 old_ref_after=0 code_pte_after=0000000021fc4cdf
+handle_page_fault: 0000000000401000
+COW dbg: pid=0 stval=0000000000401000 old_pa=0000000087ebd000 new_pa=0000000087e87000 old_ref=1 old_pte=0000000021faf553 new_pte=0000000021fa1cd7 code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000401000 old_ref_after=0 code_pte_after=0000000021fc4cdf
+Next command: /bin/app_relativepath none
+
+==========Command Start============
+
+User call fork.
+will fork a child from parent 0.
+in alloc_proc. user frame 0x0000000087ebd000, user stack 0x000000007ffff000, user kstack 0x0000000087e2b000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+fork dbg: parent=0 data_va=0000000000011000 data_pa=0000000087e2c000 ref_before=1
+fork dbg: parent=0 data_va=0000000000011000 data_pa=0000000087e2c000 ref_after=2
+going to insert process 14 to ready queue.
+going to schedule process 14 to run.
+exec dbg: pid=14 unmap CODE va=0000000000010000 pa=0000000087f13000 ref_before=1
+exec dbg: pid=14 unmap CODE va=0000000000010000 pa=0000000087f13000 ref_after=1
+exec dbg: pid=14 unmap DATA va=0000000000011000 pa=0000000087e2c000 ref_before=2
+exec dbg: pid=14 unmap DATA va=0000000000011000 pa=0000000087e2c000 ref_after=1
+Application: /bin/app_relativepath
+CODE_SEGMENT added at mapped info offset:4
+DATA_SEGMENT added at mapped info offset:5
+Application program entry point (virtual address): 0x00000000000100fc
+
+======== Test 1: change current directory  ========
+cwd:/
+change current directory to ./RAMDISK0
+cwd:/RAMDISK0
+
+======== Test 2: write/read file by relative path  ========
+write: ./ramfile
+file descriptor fd: 0
+write content: 
+hello world
+read: ./ramfile
+read content: 
+hello world
+
+======== Test 3: Go to parent directory  ========
+cwd:/RAMDISK0
+change current directory to ..
+cwd:/
+read: ./hostfile.txt
+file descriptor fd: 0
+read content: 
+hello world
+è
+
+All tests passed!
+
+User exit with code:0.
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+==========Command End============
+
+handle_page_fault: 0000000000011c68
+COW dbg: pid=0 stval=0000000000011c68 old_pa=0000000087e2c000 new_pa=0000000087f2a000 old_ref=1 old_pte=0000000021f8b15b new_pte=0000000021fca8df code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000011c68 old_ref_after=0 code_pte_after=0000000021fc4cdf
+handle_page_fault: 0000000000400000
+COW dbg: pid=0 stval=0000000000400000 old_pa=0000000087e4e000 new_pa=0000000087e2c000 old_ref=1 old_pte=0000000021f93953 new_pte=0000000021f8b0d7 code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000400000 old_ref_after=0 code_pte_after=0000000021fc4cdf
+handle_page_fault: 0000000000401000
+COW dbg: pid=0 stval=0000000000401000 old_pa=0000000087e87000 new_pa=0000000087e4e000 old_ref=1 old_pte=0000000021fa1d53 new_pte=0000000021f938d7 code_pte_before=0000000021fc4cdf
+COW dbg: pid=0 stval=0000000000401000 old_ref_after=0 code_pte_after=0000000021fc4cdf
+Next command: /bin/app_exec none
+
+==========Command Start============
+
+User call fork.
+will fork a child from parent 0.
+in alloc_proc. user frame 0x0000000087e87000, user stack 0x000000007ffff000, user kstack 0x0000000087f30000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+fork dbg: parent=0 data_va=0000000000011000 data_pa=0000000087f2a000 ref_before=1
+fork dbg: parent=0 data_va=0000000000011000 data_pa=0000000087f2a000 ref_after=2
+going to insert process 15 to ready queue.
+going to schedule process 15 to run.
+exec dbg: pid=15 unmap CODE va=0000000000010000 pa=0000000087f13000 ref_before=1
+exec dbg: pid=15 unmap CODE va=0000000000010000 pa=0000000087f13000 ref_after=1
+exec dbg: pid=15 unmap DATA va=0000000000011000 pa=0000000087f2a000 ref_before=2
+exec dbg: pid=15 unmap DATA va=0000000000011000 pa=0000000087f2a000 ref_after=1
+Application: /bin/app_exec
+CODE_SEGMENT added at mapped info offset:4
+Application program entry point (virtual address): 0x0000000000010078
+
+======== exec /bin/app_ls in app_exec ========
+exec dbg: pid=15 unmap CODE va=0000000000010000 pa=0000000087dfa000 ref_before=1
+exec dbg: pid=15 unmap CODE va=0000000000010000 pa=0000000087dfa000 ref_after=1
+Application: /bin/app_ls
+CODE_SEGMENT added at mapped info offset:4
+DATA_SEGMENT added at mapped info offset:5
+Application program entry point (virtual address): 0x00000000000100b0
+---------- ls command -----------
+ls "/RAMDISK0":
+[name]               [inode_num]
+hostfs_readdir not implemented!
+
+System is shutting down with exit code -1.

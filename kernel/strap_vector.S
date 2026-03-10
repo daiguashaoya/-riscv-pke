@@ -42,6 +42,9 @@ smode_trap_vector:
     csrw satp, t1
     sfence.vma zero, zero
 
+    # user code may overwrite tp, restore hart id from trapframe.
+    ld tp, 280(a0)
+
     # jump to smode_trap_handler() that is defined in kernel/trap.c
     jr t0
 

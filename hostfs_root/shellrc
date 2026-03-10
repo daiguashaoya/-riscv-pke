@@ -1,3 +1,12 @@
+/bin/app_print_backtrace none
+/bin/app_errorline none
+/bin/app_sum_sequence none
+/bin/app_singlepageheap none
+/bin/app_wait none
+/bin/app_semaphore none
+/bin/app_cow none
+/bin/app_relativepath none
+/bin/app_exec none
 /bin/app_mkdir /RAMDISK0/sub_dir
 /bin/app_touch /RAMDISK0/sub_dir/ramfile1
 /bin/app_touch /RAMDISK0/sub_dir/ramfile2

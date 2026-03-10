@@ -16,6 +16,8 @@
 
 #include "spike_interface/spike_utils.h"
 
+extern int kernel_is_multi_app_mode(void);
+
 //
 // handling the syscalls. will call do_syscall() defined in kernel/syscall.c
 //
@@ -62,15 +64,15 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
     if (mcause == CAUSE_STORE_PAGE_FAULT) {
       pte_t *pte = page_walk((pagetable_t)current->pagetable, stval, 0);
       if (pte != NULL && (*pte & PTE_COW)) {
-        sprint("handle_page_fault: COW page copy for stval %lx\n", stval);
-        void *old_pa = (void *)PTE2PA(*pte);
+        pte_t old_pte = *pte;
+        void *old_pa = (void *)PTE2PA(old_pte);
         void *new_pa = alloc_page();
         if (new_pa == 0)
           panic("Cant alloc more pages for COW!");
         memcpy(new_pa, old_pa, PGSIZE);
 
-        *pte = PA2PTE((uint64)new_pa) | PTE_FLAGS(*pte);
-        *pte = (*pte & ~PTE_COW) | PTE_W;
+        *pte = PA2PTE((uint64)new_pa) | PTE_FLAGS(old_pte);
+        *pte = (*pte & ~PTE_COW) | PTE_W | PTE_D | PTE_A;
 
         free_page(old_pa);
         flush_tlb();
@@ -106,6 +108,9 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
 // implements round-robin scheduling. added @lab3_3
 //
 void rrsched() {
+  if (kernel_is_multi_app_mode())
+    return;
+
   // TODO (lab3_3): implements round-robin scheduling.
   // hint: increase the tick_count member of current process by one, if it is
   // bigger than TIME_SLICE_LEN (means it has consumed its time slice), change
@@ -152,14 +157,14 @@ void print_errorline(uint64 mepc) {
 
     sprint("Runtime error at %s:%d\n", fullpath, (int)line_no);
 
-    struct file *f = vfs_open(fullpath, O_RDONLY);
+    spike_file_t *f = spike_file_open(fullpath, O_RDONLY, 0);
     if (IS_ERR_VALUE(f))
       return;
 
     char c;
     uint64 cur_line = 1;
     while (cur_line < line_no) {
-      if (vfs_read(f, &c, 1) <= 0)
+      if (spike_file_read(f, &c, 1) <= 0)
         break;
       if (c == '\n')
         cur_line++;
@@ -167,15 +172,15 @@ void print_errorline(uint64 mepc) {
 
     char buf[256];
     int len = 0;
-    while (vfs_read(f, &c, 1) > 0 && c != '\n' && len < 255) {
+    while (spike_file_read(f, &c, 1) > 0 && c != '\n' && len < 255) {
       buf[len++] = c;
     }
     buf[len] = '\0';
 
     if (len > 0)
-      sprint("%s\n", buf);
+      sprint("  %s\n", buf);
 
-    vfs_close(f);
+    spike_file_close(f);
   }
 }
 
@@ -212,6 +217,12 @@ void smode_trap_handler(void) {
     // the address of missing page is stored in stval
     // call handle_user_page_fault to process page faults
     handle_user_page_fault(cause, read_csr(sepc), read_csr(stval));
+    break;
+  case CAUSE_ILLEGAL_INSTRUCTION:
+    // When encountering an illegal instruction, print the error line and
+    // smoothly pass control.
+    print_errorline(read_csr(sepc));
+    sys_user_exit(-1);
     break;
   default:
     sprint("smode_trap_handler(): unexpected scause %p\n", read_csr(scause));

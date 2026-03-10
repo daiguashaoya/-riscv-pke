@@ -1,0 +1,384 @@
+HTIF is available!
+(Emulated) memory size: 2048 MB
+In m_start, hartid:0
+hartid = 0: Enter supervisor mode...
+PKE kernel start 0x0000000080000000, PKE kernel end: 0x000000008005e000, PKE kernel size: 0x000000000005e000 .
+free physical memory address: [0x000000008005e000, 0x0000000087ffffff] 
+kernel memory manager is initializing ...
+In m_start, hartid:1
+hartid = 1: Enter supervisor mode...
+KERN_BASE 0x0000000080000000
+physical address of _etext is: 0x000000008000c000
+kernel page table is on 
+RAMDISK0: base address of RAMDISK0 is: 0x0000000087f35000
+RFS: format RAMDISK0 done!
+Switch to user mode...
+in alloc_proc. user frame 0x0000000087f29000, user stack 0x000000007ffff000, user kstack 0x0000000087f28000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+hartid = 0: User application is loading.
+Application: /bin/app_shell
+CODE_SEGMENT added at mapped info offset:4
+DATA_SEGMENT added at mapped info offset:5
+Application program entry point (virtual address): 0x00000000000100b0
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+
+======== Shell Start ========
+
+Next command: /bin/app_print_backtrace none
+
+==========Command Start============
+
+User call fork.
+will fork a child from parent 0.
+in alloc_proc. user frame 0x0000000087f0e000, user stack 0x000000007ffff000, user kstack 0x0000000087f0c000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+going to insert process 1 to ready queue.
+going to schedule process 1 to run.
+Application: /bin/app_print_backtrace
+CODE_SEGMENT added at mapped info offset:4
+Application program entry point (virtual address): 0x000000000001011a
+back trace the user app in the following:
+f8
+f7
+f6
+f5
+f4
+f3
+f2
+User exit with code:0.
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+==========Command End============
+
+handle_page_fault: 0000000000011c68
+handle_page_fault: 0000000000400000
+handle_page_fault: 0000000000401000
+Next command: /bin/app_errorline none
+
+==========Command Start============
+
+User call fork.
+will fork a child from parent 0.
+in alloc_proc. user frame 0x0000000087ef7000, user stack 0x000000007ffff000, user kstack 0x0000000087ef5000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+going to insert process 2 to ready queue.
+going to schedule process 2 to run.
+Application: /bin/app_errorline
+CODE_SEGMENT added at mapped info offset:4
+Application program entry point (virtual address): 0x0000000000010078
+Going to hack the system by running privilege instructions.
+Runtime error at user/app_errorline.c:13
+    asm volatile("csrw sscratch, 0");
+Illegal instruction!
+User exit with code:-1.
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+==========Command End============
+
+handle_page_fault: 0000000000011c68
+handle_page_fault: 0000000000400000
+handle_page_fault: 0000000000401000
+Next command: /bin/app_sum_sequence none
+
+==========Command Start============
+
+User call fork.
+will fork a child from parent 0.
+in alloc_proc. user frame 0x0000000087ee4000, user stack 0x000000007ffff000, user kstack 0x0000000087ee1000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+going to insert process 3 to ready queue.
+going to schedule process 3 to run.
+Application: /bin/app_sum_sequence
+CODE_SEGMENT added at mapped info offset:4
+Application program entry point (virtual address): 0x00000000000100aa
+handle_page_fault: 000000007fffdff8
+handle_page_fault: 000000007fffcff8
+handle_page_fault: 000000007fffbff8
+handle_page_fault: 000000007fffaff8
+handle_page_fault: 000000007fff9ff8
+handle_page_fault: 000000007fff8ff8
+handle_page_fault: 000000007fff7ff8
+handle_page_fault: 000000007fff6ff8
+handle_page_fault: 0000000000401000
+handle_page_fault: 0000000000401000
+this address is not available!
+User exit with code:-1.
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+==========Command End============
+
+handle_page_fault: 0000000000011c68
+handle_page_fault: 0000000000400000
+handle_page_fault: 0000000000401000
+Next command: /bin/app_singlepageheap none
+
+==========Command Start============
+
+User call fork.
+will fork a child from parent 0.
+in alloc_proc. user frame 0x0000000087ec4000, user stack 0x000000007ffff000, user kstack 0x0000000087ec3000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+going to insert process 4 to ready queue.
+going to schedule process 4 to run.
+Application: /bin/app_singlepageheap
+CODE_SEGMENT added at mapped info offset:4
+DATA_SEGMENT added at mapped info offset:5
+Application program entry point (virtual address): 0x00000000000100b0
+cross page
+User exit with code:0.
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+==========Command End============
+
+handle_page_fault: 0000000000011c68
+handle_page_fault: 0000000000400000
+handle_page_fault: 0000000000401000
+Next command: /bin/app_wait none
+
+==========Command Start============
+
+User call fork.
+will fork a child from parent 0.
+in alloc_proc. user frame 0x0000000087ead000, user stack 0x000000007ffff000, user kstack 0x0000000087eac000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+going to insert process 5 to ready queue.
+going to schedule process 5 to run.
+Application: /bin/app_wait
+CODE_SEGMENT added at mapped info offset:4
+DATA_SEGMENT added at mapped info offset:5
+Application program entry point (virtual address): 0x00000000000100b0
+User call fork.
+will fork a child from parent 5.
+in alloc_proc. user frame 0x0000000087e9f000, user stack 0x000000007ffff000, user kstack 0x0000000087eca000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087e99000 of parent to child at va:0000000000010000.
+going to insert process 6 to ready queue.
+going to schedule process 6 to run.
+handle_page_fault: 00000000000118d0
+User call fork.
+will fork a child from parent 6.
+in alloc_proc. user frame 0x0000000087e8d000, user stack 0x000000007ffff000, user kstack 0x0000000087e8c000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087e99000 of parent to child at va:0000000000010000.
+going to insert process 7 to ready queue.
+going to schedule process 7 to run.
+handle_page_fault: 00000000000118d0
+Grandchild process end, flag = 2.
+User exit with code:0.
+going to insert process 6 to ready queue.
+going to schedule process 6 to run.
+Child process end, flag = 1.
+User exit with code:0.
+going to insert process 5 to ready queue.
+going to schedule process 5 to run.
+Parent process end, flag = 0.
+User exit with code:0.
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+==========Command End============
+
+handle_page_fault: 0000000000011c68
+handle_page_fault: 0000000000400000
+handle_page_fault: 0000000000401000
+Next command: /bin/app_semaphore none
+
+==========Command Start============
+
+User call fork.
+will fork a child from parent 0.
+in alloc_proc. user frame 0x0000000087e7c000, user stack 0x000000007ffff000, user kstack 0x0000000087e7b000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+going to insert process 8 to ready queue.
+going to schedule process 8 to run.
+Application: /bin/app_semaphore
+CODE_SEGMENT added at mapped info offset:4
+Application program entry point (virtual address): 0x0000000000010078
+User call fork.
+will fork a child from parent 8.
+in alloc_proc. user frame 0x0000000087e6e000, user stack 0x000000007ffff000, user kstack 0x0000000087e81000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087e68000 of parent to child at va:0000000000010000.
+going to insert process 9 to ready queue.
+going to insert process 8 to ready queue.
+going to schedule process 9 to run.
+going to schedule process 8 to run.
+User call fork.
+will fork a child from parent 8.
+in alloc_proc. user frame 0x0000000087e5e000, user stack 0x000000007ffff000, user kstack 0x0000000087e5d000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087e68000 of parent to child at va:0000000000010000.
+going to insert process 10 to ready queue.
+going to insert process 8 to ready queue.
+going to schedule process 10 to run.
+going to schedule process 8 to run.
+User call fork.
+will fork a child from parent 8.
+in alloc_proc. user frame 0x0000000087e51000, user stack 0x000000007ffff000, user kstack 0x0000000087e50000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087e68000 of parent to child at va:0000000000010000.
+going to insert process 11 to ready queue.
+going to insert process 8 to ready queue.
+going to schedule process 11 to run.
+going to schedule process 8 to run.
+semaphore 0 value: -3
+ wait queue: 9  10  11  
+going to insert process 9 to ready queue.
+going to insert process 8 to ready queue.
+going to schedule process 9 to run.
+Child 1 woke up
+User exit with code:0.
+going to schedule process 8 to run.
+semaphore 0 value: -2
+ wait queue: 10  11  
+going to insert process 10 to ready queue.
+going to insert process 8 to ready queue.
+going to schedule process 10 to run.
+Child 2 woke up
+User exit with code:0.
+going to schedule process 8 to run.
+semaphore 0 value: -1
+ wait queue: 11  
+going to insert process 11 to ready queue.
+going to insert process 8 to ready queue.
+going to schedule process 11 to run.
+Child 3 woke up
+User exit with code:0.
+going to schedule process 8 to run.
+User exit with code:0.
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+==========Command End============
+
+handle_page_fault: 0000000000011c68
+handle_page_fault: 0000000000400000
+handle_page_fault: 0000000000401000
+Next command: /bin/app_cow none
+
+==========Command Start============
+
+User call fork.
+will fork a child from parent 0.
+in alloc_proc. user frame 0x0000000087e41000, user stack 0x000000007ffff000, user kstack 0x0000000087e40000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+going to insert process 12 to ready queue.
+going to schedule process 12 to run.
+Application: /bin/app_cow
+CODE_SEGMENT added at mapped info offset:4
+Application program entry point (virtual address): 0x0000000000010078
+the physical address of parent process heap is: User call fork.
+will fork a child from parent 12.
+in alloc_proc. user frame 0x0000000087e31000, user stack 0x000000007ffff000, user kstack 0x0000000087e30000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087e2d000 of parent to child at va:0000000000010000.
+going to insert process 13 to ready queue.
+User exit with code:0.
+going to insert process 0 to ready queue.
+going to schedule process 13 to run.
+the physical address of child process heap before copy on write is: handle_page_fault: 0000000000400000
+the physical address of child process heap after copy on write is: User exit with code:0.
+going to schedule process 0 to run.
+==========Command End============
+
+handle_page_fault: 0000000000011c68
+handle_page_fault: 0000000000400000
+handle_page_fault: 0000000000401000
+Next command: /bin/app_relativepath none
+
+==========Command Start============
+
+User call fork.
+will fork a child from parent 0.
+in alloc_proc. user frame 0x0000000087e1d000, user stack 0x000000007ffff000, user kstack 0x0000000087e1c000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+going to insert process 14 to ready queue.
+going to schedule process 14 to run.
+Application: /bin/app_relativepath
+CODE_SEGMENT added at mapped info offset:4
+DATA_SEGMENT added at mapped info offset:5
+Application program entry point (virtual address): 0x00000000000100fc
+
+======== Test 1: change current directory  ========
+cwd:/
+change current directory to ./RAMDISK0
+cwd:/RAMDISK0
+
+======== Test 2: write/read file by relative path  ========
+write: ./ramfile
+file descriptor fd: 0
+write content: 
+hello world
+read: ./ramfile
+read content: 
+hello world
+
+======== Test 3: Go to parent directory  ========
+cwd:/RAMDISK0
+change current directory to ..
+cwd:/
+read: ./hostfile.txt
+file descriptor fd: 0
+read content: 
+hello world
+è
+
+All tests passed!
+
+User exit with code:0.
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+==========Command End============
+
+handle_page_fault: 0000000000011c68
+handle_page_fault: 0000000000400000
+handle_page_fault: 0000000000401000
+Next command: /bin/app_exec none
+
+==========Command Start============
+
+User call fork.
+will fork a child from parent 0.
+in alloc_proc. user frame 0x0000000087dff000, user stack 0x000000007ffff000, user kstack 0x0000000087dfd000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+going to insert process 15 to ready queue.
+going to schedule process 15 to run.
+Application: /bin/app_exec
+CODE_SEGMENT added at mapped info offset:4
+Application program entry point (virtual address): 0x0000000000010078
+
+======== exec /bin/app_ls in app_exec ========
+Application: /bin/app_ls
+CODE_SEGMENT added at mapped info offset:4
+DATA_SEGMENT added at mapped info offset:5
+Application program entry point (virtual address): 0x00000000000100b0
+---------- ls command -----------
+ls "/RAMDISK0":
+[name]               [inode_num]
+hostfs_readdir not implemented!
+
+System is shutting down with exit code -1.

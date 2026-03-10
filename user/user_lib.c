@@ -53,7 +53,8 @@ int exit(int code) {
 // lib call to naive_malloc
 //
 void *naive_malloc() {
-  return (void *)do_user_call(SYS_user_allocate_page, 4096, 0, 0, 0, 0, 0, 0);
+  // pass 0 to request one full page from the legacy naive allocator path.
+  return (void *)do_user_call(SYS_user_allocate_page, 0, 0, 0, 0, 0, 0, 0);
 }
 
 //

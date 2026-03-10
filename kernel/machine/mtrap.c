@@ -11,7 +11,28 @@ static void handle_load_access_fault() { panic("Load access fault!"); }
 
 static void handle_store_access_fault() { panic("Store/AMO access fault!"); }
 
-static void handle_illegal_instruction() { panic("Illegal instruction!"); }
+extern void print_errorline(uint64 mepc);
+
+extern void sys_user_exit(uint64 code);
+extern uint64 g_itrframe[NCPU][64];
+
+static void handle_illegal_instruction() {
+  print_errorline(read_csr(mepc));
+  sprint("Illegal instruction!\n");
+
+  if (current) {
+    write_csr(mepc, (uint64)sys_user_exit);
+    uint64 mstat = read_csr(mstatus);
+    mstat = (mstat & ~(3ULL << 11)) | (1ULL << 11); // MPP = S-mode
+    write_csr(mstatus, mstat);
+    g_itrframe[get_hartid()][9] = -1;              // a0
+    g_itrframe[get_hartid()][1] = current->kstack; // sp
+    write_csr(satp, current->trapframe->kernel_satp);
+    flush_tlb();
+  } else {
+    panic("Illegal instruction!");
+  }
+}
 
 static void handle_misaligned_load() { panic("Misaligned Load!"); }
 

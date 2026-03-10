@@ -12,6 +12,7 @@
 #include "sched.h"
 #include "spike_interface/spike_utils.h"
 #include "string.h"
+#include "sync_utils.h"
 #include "util/types.h"
 #include "vfs.h"
 #include "vmm.h"
@@ -38,6 +39,22 @@ typedef union {
   char *argv[MAX_CMDLINE_ARGS];
 } arg_buf;
 
+enum boot_mode {
+  BOOT_MODE_SINGLE_APP = 0,
+  BOOT_MODE_MULTI_APP = 1,
+};
+
+static volatile int g_boot_mode = BOOT_MODE_SINGLE_APP;
+static volatile int g_boot_args_ready = 0;
+static size_t g_boot_argc = 0;
+static char *g_boot_argv[MAX_CMDLINE_ARGS];
+static char g_boot_arg_storage[MAX_CMDLINE_ARGS][128];
+static process *g_multi_boot_proc[NCPU] = {0};
+
+int kernel_is_multi_app_mode(void) {
+  return g_boot_mode == BOOT_MODE_MULTI_APP;
+}
+
 //
 // returns the number (should be 1) of string(s) after PKE kernel in command
 // line. and store the string(s) in arg_bug_msg.
@@ -62,27 +79,44 @@ static size_t parse_args(arg_buf *arg_bug_msg) {
 }
 
 //
-// load the elf, and construct a "process" (with only a trapframe).
-// load_bincode_from_host_elf is defined in elf.c
+// capture startup args once on hart0, then share via globals.
 //
-process *load_user_program() {
-  process *proc;
-
-  proc = alloc_process();
-  sprint("User application is loading.\n");
-
+static void init_boot_args(void) {
   arg_buf arg_bug_msg;
-
-  // retrieve command line arguements
   size_t argc = parse_args(&arg_bug_msg);
   if (!argc)
     panic("You need to specify the application program!\n");
 
-  load_bincode_from_host_elf(proc, arg_bug_msg.argv[0]);
-  return proc;
+  if (argc > MAX_CMDLINE_ARGS)
+    argc = MAX_CMDLINE_ARGS;
+
+  g_boot_argc = argc;
+  for (size_t i = 0; i < argc; i++) {
+    const char *src = arg_bug_msg.argv[i];
+    size_t j = 0;
+    for (; src[j] && j + 1 < sizeof(g_boot_arg_storage[i]); j++)
+      g_boot_arg_storage[i][j] = src[j];
+    g_boot_arg_storage[i][j] = '\0';
+    g_boot_argv[i] = g_boot_arg_storage[i];
+  }
+  for (size_t i = argc; i < MAX_CMDLINE_ARGS; i++)
+    g_boot_argv[i] = 0;
+
+  g_boot_mode = (argc >= NCPU) ? BOOT_MODE_MULTI_APP : BOOT_MODE_SINGLE_APP;
+  g_boot_args_ready = 1;
 }
 
-#include "sync_utils.h"
+//
+// load the elf, and construct a process.
+//
+static process *load_user_program(char *app_path, int target_hart) {
+  process *proc = alloc_process();
+  proc->status = READY;
+  sprint("hartid = %d: User application is loading.\n", target_hart);
+  load_bincode_from_host_elf(proc, app_path);
+  proc->trapframe->regs.tp = target_hart;
+  return proc;
+}
 
 //
 // s_start: S-mode entry point of riscv-pke OS kernel.
@@ -101,8 +135,8 @@ int s_start(void) {
     kern_vm_init();
   }
 
-  static volatile int s_init_count = 0;
-  sync_barrier(&s_init_count, NCPU);
+  static volatile int s_vm_init_count = 0;
+  sync_barrier(&s_vm_init_count, NCPU);
 
   // now, switch to paging mode by turning on paging (SV39)
   enable_paging();
@@ -111,14 +145,40 @@ int s_start(void) {
     sprint("kernel page table is on \n");
     init_proc_pool();
     fs_init();
-    sprint("Switch to user mode...\n");
-    insert_to_ready_queue(load_user_program());
-    schedule();
+    init_boot_args();
+  }
+
+  static volatile int s_boot_ready_count = 0;
+  sync_barrier(&s_boot_ready_count, NCPU);
+
+  if (!g_boot_args_ready)
+    panic("Boot args are not initialized.\n");
+
+  if (g_boot_mode == BOOT_MODE_MULTI_APP) {
+    if (hartid == 0) {
+      for (int i = 0; i < NCPU; i++) {
+        if ((size_t)i >= g_boot_argc || g_boot_argv[i] == 0)
+          panic("Not enough apps for multicore startup.\n");
+        g_multi_boot_proc[i] = load_user_program(g_boot_argv[i], i);
+      }
+    }
+
+    static volatile int s_multi_load_count = 0;
+    sync_barrier(&s_multi_load_count, NCPU);
+
+    if (g_multi_boot_proc[hartid] == 0)
+      panic("Missing startup process for hart %d.\n", hartid);
+
+    sprint("hartid = %d: Switch to user mode...\n", hartid);
+    switch_to(g_multi_boot_proc[hartid]);
   } else {
-    // hart1 just idles in an infinite loop because the scheduler (Lab 3) is
-    // single-core
-    while (1) {
-      asm volatile("wfi");
+    if (hartid == 0) {
+      sprint("Switch to user mode...\n");
+      insert_to_ready_queue(load_user_program(g_boot_argv[0], 0));
+      schedule();
+    } else {
+      while (1)
+        asm volatile("wfi");
     }
   }
 

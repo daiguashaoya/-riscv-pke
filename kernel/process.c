@@ -41,7 +41,8 @@ process *current_proc[NCPU] = {NULL};
 //
 void switch_to(process *proc) {
   assert(proc);
-  current = proc;
+  int hartid = get_hartid();
+  current_proc[hartid] = proc;
 
   // write the smode_trap_vector (64-bit func. address) defined in
   // kernel/strap_vector.S to the stvec privilege register, such that trap
@@ -54,6 +55,7 @@ void switch_to(process *proc) {
   proc->trapframe->kernel_sp = proc->kstack;     // process's kernel stack
   proc->trapframe->kernel_satp = read_csr(satp); // kernel page table
   proc->trapframe->kernel_trap = (uint64)smode_trap_handler;
+  proc->trapframe->hartid = hartid;
 
   // SSTATUS_SPP and SSTATUS_SPIE are defined in kernel/riscv.h
   // set S Previous Privilege mode (the SSTATUS_SPP bit in sstatus register) to
@@ -237,13 +239,13 @@ int do_fork(process *parent) {
         inc_page_ref(pa);
 
         pte_t *pte_parent = page_walk(parent->pagetable, hb, 0);
-        *pte_parent = (*pte_parent & ~PTE_W) | PTE_COW;
+        *pte_parent = (*pte_parent & ~(PTE_W | PTE_D)) | PTE_COW | PTE_A;
 
         user_vm_map((pagetable_t)child->pagetable, hb, PGSIZE, (uint64)pa,
                     prot_to_type(PROT_READ, 1));
 
         pte_t *pte_child = page_walk((pagetable_t)child->pagetable, hb, 0);
-        *pte_child |= PTE_COW;
+        *pte_child |= PTE_COW | PTE_A;
 
         child->user_heap.heap_pages_pa[h] =
             (uint64)pa; // It will be the same pa
@@ -284,13 +286,13 @@ int do_fork(process *parent) {
         inc_page_ref(pa);
 
         pte_t *pte_parent = page_walk(parent->pagetable, data_va, 0);
-        *pte_parent = (*pte_parent & ~PTE_W) | PTE_COW;
+        *pte_parent = (*pte_parent & ~(PTE_W | PTE_D)) | PTE_COW | PTE_A;
 
         user_vm_map((pagetable_t)child->pagetable, data_va, PGSIZE, (uint64)pa,
                     prot_to_type(PROT_READ, 1));
 
         pte_t *pte_child = page_walk((pagetable_t)child->pagetable, data_va, 0);
-        *pte_child |= PTE_COW;
+        *pte_child |= PTE_COW | PTE_A;
       }
       child->mapped_info[child->total_mapped_region].va =
           parent->mapped_info[i].va;
@@ -318,6 +320,13 @@ int do_fork(process *parent) {
 // added @lab4_challenge3
 //
 int do_exec(char *path, char *para) {
+  if (path == NULL)
+    return -1;
+  if (para == NULL)
+    para = "";
+  if (para[0] == '\0')
+    para = "/RAMDISK0";
+
   // Step 1: unmap old CODE and DATA segments
   for (int i = 0; i < current->total_mapped_region; i++) {
     if (current->mapped_info[i].seg_type == CODE_SEGMENT) {

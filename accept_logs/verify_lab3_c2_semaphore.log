@@ -1,0 +1,207 @@
+HTIF is available!
+(Emulated) memory size: 2048 MB
+In m_start, hartid:0
+hartid = 0: Enter supervisor mode...
+PKE kernel start 0x0000000080000000, PKE kernel end: 0x000000008005e000, PKE kernel size: 0x000000000005e000 .
+free physical memory address: [0x000000008005e000, 0x0000000087ffffff] 
+kernel memory manager is initializing ...
+In m_start, hartid:1
+hartid = 1: Enter supervisor mode...
+KERN_BASE 0x0000000080000000
+physical address of _etext is: 0x000000008000c000
+kernel page table is on 
+RAMDISK0: base address of RAMDISK0 is: 0x0000000087f35000
+RFS: format RAMDISK0 done!
+Switch to user mode...
+in alloc_proc. user frame 0x0000000087f29000, user stack 0x000000007ffff000, user kstack 0x0000000087f28000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+hartid = 0: User application is loading.
+Application: /bin/app_semaphore
+CODE_SEGMENT added at mapped info offset:4
+Application program entry point (virtual address): 0x0000000000010078
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+User call fork.
+will fork a child from parent 0.
+in alloc_proc. user frame 0x0000000087f19000, user stack 0x000000007ffff000, user kstack 0x0000000087f1b000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+going to insert process 1 to ready queue.
+Parent print 0
+semaphore 1 value: 0
+ wait queue: 
+going to schedule process 1 to run.
+User call fork.
+will fork a child from parent 1.
+in alloc_proc. user frame 0x0000000087f07000, user stack 0x000000007ffff000, user kstack 0x0000000087f06000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+do_fork map code segment at pa:0000000087f13000 of parent to child at va:0000000000010000.
+going to insert process 2 to ready queue.
+Child0 print 0
+semaphore 2 value: 0
+ wait queue: 
+going to schedule process 2 to run.
+Child1 print 0
+semaphore 0 value: -1
+ wait queue: 0  
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+Parent print 1
+semaphore 1 value: -1
+ wait queue: 1  
+going to insert process 1 to ready queue.
+going to schedule process 1 to run.
+Child0 print 1
+semaphore 2 value: -1
+ wait queue: 2  
+going to insert process 2 to ready queue.
+going to schedule process 2 to run.
+Child1 print 1
+semaphore 0 value: -1
+ wait queue: 0  
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+Parent print 2
+semaphore 1 value: -1
+ wait queue: 1  
+going to insert process 1 to ready queue.
+going to schedule process 1 to run.
+Child0 print 2
+semaphore 2 value: -1
+ wait queue: 2  
+going to insert process 2 to ready queue.
+going to schedule process 2 to run.
+Child1 print 2
+semaphore 0 value: -1
+ wait queue: 0  
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+Parent print 3
+semaphore 1 value: -1
+ wait queue: 1  
+going to insert process 1 to ready queue.
+going to schedule process 1 to run.
+Child0 print 3
+semaphore 2 value: -1
+ wait queue: 2  
+going to insert process 2 to ready queue.
+going to schedule process 2 to run.
+Child1 print 3
+semaphore 0 value: -1
+ wait queue: 0  
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+Parent print 4
+semaphore 1 value: -1
+ wait queue: 1  
+going to insert process 1 to ready queue.
+going to schedule process 1 to run.
+Child0 print 4
+semaphore 2 value: -1
+ wait queue: 2  
+going to insert process 2 to ready queue.
+going to schedule process 2 to run.
+Child1 print 4
+semaphore 0 value: -1
+ wait queue: 0  
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+Parent print 5
+semaphore 1 value: -1
+ wait queue: 1  
+going to insert process 1 to ready queue.
+going to schedule process 1 to run.
+Child0 print 5
+semaphore 2 value: -1
+ wait queue: 2  
+going to insert process 2 to ready queue.
+going to schedule process 2 to run.
+Child1 print 5
+semaphore 0 value: -1
+ wait queue: 0  
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+Parent print 6
+semaphore 1 value: -1
+ wait queue: 1  
+going to insert process 1 to ready queue.
+going to schedule process 1 to run.
+Child0 print 6
+semaphore 2 value: -1
+ wait queue: 2  
+going to insert process 2 to ready queue.
+going to schedule process 2 to run.
+Child1 print 6
+semaphore 0 value: -1
+ wait queue: 0  
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+Parent print 7
+semaphore 1 value: -1
+ wait queue: 1  
+going to insert process 1 to ready queue.
+going to schedule process 1 to run.
+Child0 print 7
+semaphore 2 value: -1
+ wait queue: 2  
+going to insert process 2 to ready queue.
+going to schedule process 2 to run.
+Child1 print 7
+semaphore 0 value: -1
+ wait queue: 0  
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+Parent print 8
+semaphore 1 value: -1
+ wait queue: 1  
+going to insert process 1 to ready queue.
+going to schedule process 1 to run.
+Child0 print 8
+semaphore 2 value: -1
+ wait queue: 2  
+going to insert process 2 to ready queue.
+going to schedule process 2 to run.
+Child1 print 8
+semaphore 0 value: -1
+ wait queue: 0  
+going to insert process 0 to ready queue.
+going to schedule process 0 to run.
+Parent print 9
+semaphore 1 value: -1
+ wait queue: 1  
+going to insert process 1 to ready queue.
+going to insert process 0 to ready queue.
+going to schedule process 1 to run.
+Child0 print 9
+semaphore 2 value: -1
+ wait queue: 2  
+going to insert process 2 to ready queue.
+going to insert process 1 to ready queue.
+going to schedule process 0 to run.
+going to insert process 0 to ready queue.
+going to schedule process 2 to run.
+Child1 print 9
+semaphore 0 value: 0
+ wait queue: 
+going to insert process 2 to ready queue.
+going to schedule process 1 to run.
+going to insert process 1 to ready queue.
+going to schedule process 0 to run.
+going to insert process 0 to ready queue.
+going to schedule process 2 to run.
+going to insert process 2 to ready queue.
+going to schedule process 1 to run.
+going to insert process 1 to ready queue.
+going to schedule process 0 to run.
+User exit with code:0.
+going to schedule process 2 to run.
+going to insert process 2 to ready queue.
+going to schedule process 1 to run.
+User exit with code:0.
+going to schedule process 2 to run.
+User exit with code:0.
+no more ready processes, system shutdown now.
+System is shutting down with exit code 0.

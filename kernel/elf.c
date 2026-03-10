@@ -8,6 +8,7 @@
 #include "riscv.h"
 #include "spike_interface/spike_utils.h"
 #include "string.h"
+#include "util/functions.h"
 #include "vfs.h"
 #include "vmm.h"
 
@@ -27,17 +28,20 @@ typedef struct elf_info_t {
 static void *elf_alloc_mb(elf_ctx *ctx, uint64 elf_pa, uint64 elf_va,
                           uint64 size) {
   elf_info *msg = (elf_info *)ctx->info;
-  // we assume that size of proram segment is smaller than a page.
-  kassert(size < PGSIZE);
+  uint64 va_base = ROUNDDOWN(elf_va, PGSIZE);
+  uint64 va_off = elf_va - va_base;
+  // the teaching labs keep each loadable segment within one page.
+  kassert(va_off + size <= PGSIZE);
+
   void *pa = alloc_page();
   if (pa == 0)
     panic("uvmalloc mem alloc falied\n");
 
   memset((void *)pa, 0, PGSIZE);
-  user_vm_map((pagetable_t)msg->p->pagetable, elf_va, PGSIZE, (uint64)pa,
+  user_vm_map((pagetable_t)msg->p->pagetable, va_base, PGSIZE, (uint64)pa,
               prot_to_type(PROT_WRITE | PROT_READ | PROT_EXEC, 1));
 
-  return pa;
+  return (void *)((uint64)pa + va_off);
 }
 
 //
@@ -302,7 +306,7 @@ elf_status elf_load(elf_ctx *ctx) {
         break;
 
     ((process *)(((elf_info *)(ctx->info))->p))->mapped_info[j].va =
-        ph_addr.vaddr;
+        ROUNDDOWN(ph_addr.vaddr, PGSIZE);
     ((process *)(((elf_info *)(ctx->info))->p))->mapped_info[j].npages = 1;
 
     // SEGMENT_READABLE, SEGMENT_EXECUTABLE, SEGMENT_WRITABLE are defined in

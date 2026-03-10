@@ -20,17 +20,28 @@
 
 #include "spike_interface/spike_utils.h"
 
+extern int kernel_is_multi_app_mode(void);
+
+static volatile int g_multi_exit_count = 0;
+static volatile int g_multi_exit_done = 0;
+static volatile int g_multi_exit_code = 0;
+static volatile int g_multi_hart_exited[NCPU] = {0};
+
 //
 // implement the SYS_user_print syscall
 //
 ssize_t sys_user_print(const char *buf, size_t n) {
+  int hartid = get_hartid();
   // buf is now an address in user space of the given app's user stack,
   // so we have to transfer it into phisical address (kernel is running in
   // direct mapping).
   assert(current);
   char *pa =
       (char *)user_va_to_pa((pagetable_t)(current->pagetable), (void *)buf);
-  sprint(pa);
+  if (kernel_is_multi_app_mode())
+    sprint("hartid = %d: %s", hartid, pa);
+  else
+    sprint(pa);
   return 0;
 }
 
@@ -38,6 +49,35 @@ ssize_t sys_user_print(const char *buf, size_t n) {
 // implement the SYS_user_exit syscall
 //
 ssize_t sys_user_exit(uint64 code) {
+  int hartid = get_hartid();
+
+  if (kernel_is_multi_app_mode()) {
+    sprint("hartid = %d: User exit with code:%d.\n", hartid, code);
+
+    if (!g_multi_hart_exited[hartid]) {
+      g_multi_hart_exited[hartid] = 1;
+      g_multi_exit_code = (int)code;
+      int old;
+      asm volatile("amoadd.w %0, %2, (%1)\n"
+                   : "=r"(old)
+                   : "r"(&g_multi_exit_count), "r"(1)
+                   : "memory");
+      if (old + 1 >= NCPU)
+        g_multi_exit_done = 1;
+    }
+
+    if (hartid == 0) {
+      while (!g_multi_exit_done)
+        asm volatile("" ::: "memory");
+      sprint("hartid = 0: shutdown with code:%d.\n", (int)g_multi_exit_code);
+      shutdown(g_multi_exit_code);
+    } else {
+      while (1)
+        asm volatile("wfi");
+    }
+    return 0;
+  }
+
   sprint("User exit with code:%d.\n", code);
   // reclaim the current process, and reschedule. added @lab3_1
   free_process(current);
@@ -48,6 +88,7 @@ ssize_t sys_user_exit(uint64 code) {
 void print_symbol(struct file *f, elf_sect_header *symtab,
                   elf_sect_header *strtab, uint64_t addr) {
   elf_sym sym;
+  int old_offset = f->offset; // Save offset before reading
   for (uint64_t off = 0; off < symtab->size; off += sizeof(sym)) {
     vfs_lseek(f, symtab->offset + off, SEEK_SET);
     vfs_read(f, (char *)&sym, sizeof(sym));
@@ -63,16 +104,18 @@ void print_symbol(struct file *f, elf_sect_header *symtab,
       vfs_read(f, name, sizeof(name));
       name[63] = '\0'; // Ensure null termination
       sprint("%s\n", name);
+      f->offset = old_offset; // Restore offset
       return;
     }
   }
   sprint("???\n");
+  f->offset = old_offset; // Restore offset
 }
 
 ssize_t sys_user_backtrace(int depth) {
   struct file *f = vfs_open(current->app_name, O_RDONLY);
   if (IS_ERR_VALUE(f)) {
-    sprint("Failed to open ELF file: %s\n", current->app_name);
+    sprint("sys_user_backtrace: cannot open ELF: %s\n", current->app_name);
     return -1;
   }
 
@@ -85,15 +128,14 @@ ssize_t sys_user_backtrace(int depth) {
   vfs_lseek(f, ehdr.shoff + ehdr.shstrndx * ehdr.shentsize, SEEK_SET);
   vfs_read(f, (char *)&shstrtab_hdr, sizeof(shstrtab_hdr));
 
-  // Read section header string table
-  char shstrtab_buf[4096];
-  if (shstrtab_hdr.size > sizeof(shstrtab_buf)) {
-    sprint("shstrtab too big\n");
+  char *shstrtab_buf = (char *)alloc_page();
+  if (!shstrtab_buf) {
     vfs_close(f);
     return -1;
   }
   vfs_lseek(f, shstrtab_hdr.offset, SEEK_SET);
-  vfs_read(f, shstrtab_buf, shstrtab_hdr.size);
+  vfs_read(f, shstrtab_buf,
+           shstrtab_hdr.size > PGSIZE ? PGSIZE : shstrtab_hdr.size);
 
   elf_sect_header symtab_hdr, strtab_hdr;
   int found_symtab = 0, found_strtab = 0;
@@ -113,29 +155,47 @@ ssize_t sys_user_backtrace(int depth) {
     }
   }
 
+  free_page(shstrtab_buf);
+
   if (!found_symtab || !found_strtab) {
-    sprint("Symbol table or string table not found\n");
     vfs_close(f);
     return -1;
   }
 
   uint64_t fp = current->trapframe->regs.s0;
 
-  // Skip do_user_call frame
-  fp = *(uint64_t *)(fp - 8);
-  // Get return address to f8 (from print_backtrace frame)
-  uint64_t ra = *(uint64_t *)(fp - 8);
-  // Go to f8 frame
-  fp = *(uint64_t *)(fp - 16);
+  // Skip the do_user_call frame. do_user_call is a leaf function
+  // that saves its caller's frame pointer (s0) at s0 - 8.
+  if ((fp - 8) < MAXVA) {
+    void *pa_caller_fp =
+        user_va_to_pa((pagetable_t)current->pagetable, (void *)(fp - 8));
+    if (pa_caller_fp) {
+      fp = *(uint64_t *)pa_caller_fp;
+    }
+  }
 
-  // Print f8
-  print_symbol(f, &symtab_hdr, &strtab_hdr, ra);
+  uint64_t ra = 0;
 
-  for (int i = 0; i < depth - 1; i++) {
+  for (int i = 0; i < depth; i++) {
     if (fp == 0)
       break;
-    ra = *(uint64_t *)(fp - 8);
-    fp = *(uint64_t *)(fp - 16);
+
+    // The stack pointer (fp) is a user virtual address.
+    if ((fp - 8) >= MAXVA || (fp - 16) >= MAXVA) {
+      break;
+    }
+
+    void *pa_ra =
+        user_va_to_pa((pagetable_t)current->pagetable, (void *)(fp - 8));
+    void *pa_fp =
+        user_va_to_pa((pagetable_t)current->pagetable, (void *)(fp - 16));
+
+    if (!pa_ra || !pa_fp)
+      break;
+
+    ra = *(uint64_t *)pa_ra;
+    fp = *(uint64_t *)pa_fp;
+
     print_symbol(f, &symtab_hdr, &strtab_hdr, ra);
   }
 
@@ -183,6 +243,28 @@ static void *heap_expand_pages(int n_pages) {
 // better implementation of malloc
 //
 uint64 sys_user_allocate_page(int n) {
+  if (n == 0) {
+    if (current->user_heap.heap_pages_cnt >= MAX_HEAP_PAGES)
+      panic("naive_malloc: heap too large\n");
+
+    void *pa = alloc_page();
+    if (!pa)
+      panic("naive_malloc: out of memory\n");
+    memset(pa, 0, PGSIZE);
+
+    uint64 va = current->user_heap.heap_top;
+    current->user_heap.heap_top += PGSIZE;
+    user_vm_map((pagetable_t)current->pagetable, va, PGSIZE, (uint64)pa,
+                prot_to_type(PROT_WRITE | PROT_READ, 1));
+
+    int idx = current->user_heap.heap_pages_cnt++;
+    current->user_heap.heap_pages_pa[idx] = (uint64)pa;
+    current->user_heap.heap_pages_va[idx] = va;
+    current->mapped_info[HEAP_SEGMENT].npages++;
+
+    return va;
+  }
+
   if (n <= 0)
     return 0;
   // 将 n 对齐到 8 字节
@@ -255,6 +337,11 @@ uint64 sys_user_allocate_page(int n) {
 // reclaim a page, indicated by "va". added @lab2_2
 //
 uint64 sys_user_free_page(uint64 va) {
+  if ((va % PGSIZE) == 0) {
+    user_vm_unmap((pagetable_t)current->pagetable, va, PGSIZE, 1);
+    return 0;
+  }
+
   uint64 mcb_va = va - sizeof(mem_block);
   mem_block *blk = (mem_block *)user_va_to_pa((pagetable_t)current->pagetable,
                                               (void *)mcb_va);

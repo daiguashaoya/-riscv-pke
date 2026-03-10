@@ -1,0 +1,54 @@
+HTIF is available!
+(Emulated) memory size: 2048 MB
+In m_start, hartid:0
+hartid = 0: Enter supervisor mode...
+PKE kernel start 0x0000000080000000, PKE kernel end: 0x000000008005e000, PKE kernel size: 0x000000000005e000 .
+free physical memory address: [0x000000008005e000, 0x0000000087ffffff] 
+kernel memory manager is initializing ...
+In m_start, hartid:1
+hartid = 1: Enter supervisor mode...
+KERN_BASE 0x0000000080000000
+physical address of _etext is: 0x000000008000c000
+kernel page table is on 
+RAMDISK0: base address of RAMDISK0 is: 0x0000000087f35000
+RFS: format RAMDISK0 done!
+in alloc_proc. user frame 0x0000000087f29000, user stack 0x000000007ffff000, user kstack 0x0000000087f28000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+hartid = 0: User application is loading.
+Application: /bin/app_alloc0
+CODE_SEGMENT added at mapped info offset:4
+Application program entry point (virtual address): 0x0000000000010078
+in alloc_proc. user frame 0x0000000087f19000, user stack 0x000000007ffff000, user kstack 0x0000000087f1b000 
+FS: created a file management struct for a process.
+in alloc_proc. build proc_file_management successfully.
+hartid = 1: User application is loading.
+Application: /bin/app_alloc1
+CODE_SEGMENT added at mapped info offset:4
+Application program entry point (virtual address): 0x0000000000010078
+hartid = 0: Switch to user mode...
+hartid = 1: Switch to user mode...
+hartid = 0: === user alloc 0 @ vaddr 0x00400000
+hartid = 1: >>> user alloc 1 @ vaddr 0x00400000
+hartid = 0: === user alloc 0 @ vaddr 0x00401000
+hartid = 1: >>> user alloc 1 @ vaddr 0x00401000
+hartid = 0: === user alloc 0 @ vaddr 0x00402000
+hartid = 1: >>> user alloc 1 @ vaddr 0x00402000
+hartid = 0: === user alloc 0 @ vaddr 0x00403000
+hartid = 1: >>> user alloc 1 @ vaddr 0x00403000
+hartid = 0: === user alloc 0 @ vaddr 0x00404000
+hartid = 1: >>> user alloc 1 @ vaddr 0x00404000
+hartid = 0: === user 0: 0
+hartid = 1: >>> user 1: 5
+hartid = 0: === user 0: 1
+hartid = 1: >>> user 1: 6
+hartid = 0: === user 0: 2
+hartid = 1: >>> user 1: 7
+hartid = 0: === user 0: 3
+hartid = 1: >>> user 1: 8
+hartid = 0: === user 0: 4
+hartid = 1: >>> user 1: 9
+hartid = 0: User exit with code:0.
+hartid = 1: User exit with code:0.
+hartid = 0: shutdown with code:0.
+System is shutting down with exit code 0.

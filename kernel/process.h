@@ -18,6 +18,9 @@ typedef struct trapframe_t {
 
   // kernel page table. added @lab2_1
   /* offset:272 */ uint64 kernel_satp;
+
+  // owning hart id. used to restore tp in trap entry for multicore mode.
+  /* offset:280 */ uint64 hartid;
 } trapframe;
 
 // riscv-pke kernel supports at most 32 processes
