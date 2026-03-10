@@ -14,6 +14,9 @@
 // added @lab3_1
 #define SYS_user_fork (SYS_user_base + 4)
 #define SYS_user_yield (SYS_user_base + 5)
+// added @lab1_challenge1
+#define SYS_user_print_backtrace (SYS_user_base + 6)
+
 // added @lab4_1
 #define SYS_user_open (SYS_user_base + 17)
 #define SYS_user_read (SYS_user_base + 18)

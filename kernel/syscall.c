@@ -7,6 +7,7 @@
 
 #include "pmm.h"
 #include "proc_file.h"
+#include "elf.h"
 #include "process.h"
 #include "sched.h"
 #include "string.h"
@@ -255,6 +256,43 @@ ssize_t sys_user_wait(int pid) { return do_wait(pid); }
 // [a0]: the syscall number; [a1] ... [a7]: arguments to the syscalls.
 // returns the code of success, (e.g., 0 means success, fail for otherwise)
 //
+static int read_user_u64(uint64 uva, uint64 *out) {
+  void *pa =
+      user_va_to_pa((pagetable_t)(current->pagetable), (void *)uva);
+  if (pa == NULL)
+    return -1;
+  *out = *(uint64 *)pa;
+  return 0;
+}
+
+ssize_t sys_user_print_backtrace(uint64 depth) {
+  // At ecall we are in do_user_call(); start from its caller's frame pointer.
+  uint64 fp = 0;
+  if (read_user_u64(current->trapframe->regs.sp + 24, &fp) != 0)
+    return 0;
+  for (uint64 i = 0; i < depth && fp != 0; i++) {
+    if (fp & 0x7)
+      break;
+
+    uint64 ra = 0;
+    if (read_user_u64(fp - 8, &ra) != 0)
+      break;
+
+    char *func_name = find_symbol_name_by_addr(ra);
+    sprint("%s\n", func_name ? func_name : "unknown");
+
+    uint64 prev_fp = 0;
+    if (read_user_u64(fp - 16, &prev_fp) != 0)
+      break;
+
+    // stack grows downward, so caller frame pointer should be larger.
+    if (prev_fp <= fp)
+      break;
+    fp = prev_fp;
+  }
+  return 0;
+}
+
 long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
                 long a7) {
   switch (a0) {
@@ -305,6 +343,8 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
     return sys_user_exec((char *)a1, (char *)a2);
   case SYS_user_wait:
     return sys_user_wait((int)a1);
+  case SYS_user_print_backtrace:
+    return sys_user_print_backtrace(a1);
   default:
     panic("Unknown syscall %ld \n", a0);
   }

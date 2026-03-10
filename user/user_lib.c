@@ -161,6 +161,11 @@ int unlink_u(const char *fn) {
 //
 int close(int fd) { return do_user_call(SYS_user_close, fd, 0, 0, 0, 0, 0, 0); }
 
+// lab1_challenge1
+int print_backtrace(int depth) {
+  return do_user_call(SYS_user_print_backtrace, depth, 0, 0, 0, 0, 0, 0);
+}
+
 //
 // lib call to exec: replace current process image with a new program.
 // path: path to the ELF file; para: single argument string.
