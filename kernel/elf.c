@@ -17,11 +17,12 @@ typedef struct elf_info_t {
   process *p;
 } elf_info;
 
-static elf_section_header shstrtab_header;
-static uint64 symtab_off = 0, symtab_sz = 0;
-static uint64 strtab_off = 0, strtab_sz = 0;
+elf_section_header shstrtab_header;
+uint64 symtab_off = 0, symtab_sz = 0;
+uint64 strtab_off = 0, strtab_sz = 0;
+
+elf_ctx elfloader;
 static elf_info g_elf_info;
-static elf_ctx g_elfloader;
 
 char debug_line_data[128 * 1024];
 
@@ -241,7 +242,8 @@ static uint64 elf_fpread(elf_ctx *ctx, void *dest, uint64 nb, uint64 offset) {
   return vfs_read(msg->f, dest, nb);
 }
 
-char *find_symbol_name_by_addr(uint64 addr) {
+char *find_symbol_name_by_addr(uint64 addr)
+{
   if (g_elf_info.f == NULL || symtab_sz == 0 || strtab_off == 0)
     return "unknown";
 
@@ -249,19 +251,21 @@ char *find_symbol_name_by_addr(uint64 addr) {
   // 计算有多少个符号
   int num_symbols = symtab_sz / sizeof(elf_symbol);
 
-  for (int i = 0; i < num_symbols; i++) {
+  for (int i = 0; i < num_symbols; i++)
+  {
     // 1. 读取第 i 个符号
     // 偏移量 = 符号表起点 + i * 单个符号大小
     uint64 current_sym_offset = symtab_off + i * sizeof(elf_symbol);
-    elf_fpread(&g_elfloader, &sym, sizeof(sym), current_sym_offset);
+    elf_fpread(&elfloader, &sym, sizeof(sym), current_sym_offset);
     // 2. 核心判断：地址匹配
     // 如果 ra 落在 [sym.value, sym.value + sym.size) 区间
-    if (addr >= sym.value && addr < (sym.value + sym.size)) {
+    if (addr >= sym.value && addr < (sym.value + sym.size))
+    {
       // 3. 找到了！去 .strtab 读名字
       // 名字位置 = 字符串表起点 + 符号中的 name 偏移
       static char func_name_buf[64]; // 静态buffer返回（或者你可以malloc）
       memset(func_name_buf, 0, sizeof(func_name_buf));
-      elf_fpread(&g_elfloader, func_name_buf, sizeof(func_name_buf) - 1,
+      elf_fpread(&elfloader, func_name_buf, sizeof(func_name_buf) - 1,
                  strtab_off + sym.name);
 
       return func_name_buf;
@@ -339,6 +343,7 @@ elf_status elf_load(elf_ctx *ctx) {
 void load_bincode_from_host_elf(process *p, char *filename) {
   sprint("Application: %s\n", filename);
 
+  // keep a persistent loader context for later symbol lookup/backtrace.
   if (g_elf_info.f != NULL) {
     vfs_close(g_elf_info.f);
     g_elf_info.f = NULL;
@@ -348,26 +353,27 @@ void load_bincode_from_host_elf(process *p, char *filename) {
   g_elf_info.p = p;
   symtab_off = symtab_sz = 0;
   strtab_off = strtab_sz = 0;
+
   // IS_ERR_VALUE is a macro defined in spike_interface/spike_htif.h
   if (g_elf_info.f == NULL || IS_ERR_VALUE((uint64)g_elf_info.f))
-    panic("Fail on opening the input application program.");
+    panic("Fail on opening the input application program.\n");
 
   // init elfloader context. elf_init() is defined above.
-  if (elf_init(&g_elfloader, &g_elf_info) != EL_OK)
+  if (elf_init(&elfloader, &g_elf_info) != EL_OK)
     panic("fail to init elfloader.\n");
 
   // load elf. elf_load() is defined above.
-  if (elf_load(&g_elfloader) != EL_OK) panic("Fail on loading elf.\n");
+  if (elf_load(&elfloader) != EL_OK) panic("Fail on loading elf.\n");
 
   // entry (virtual, also physical in lab1_x) address
-  p->trapframe->epc = g_elfloader.ehdr.entry;
+  p->trapframe->epc = elfloader.ehdr.entry;
 
 
   // 找到shstrtab_header
   uint64 shstrtab_header_offset =
-      g_elfloader.ehdr.shoff +
-      g_elfloader.ehdr.shstrndx * g_elfloader.ehdr.shentsize;
-  elf_fpread(&g_elfloader, &shstrtab_header, sizeof(shstrtab_header),
+      elfloader.ehdr.shoff +
+      elfloader.ehdr.shstrndx * elfloader.ehdr.shentsize;
+  elf_fpread(&elfloader, &shstrtab_header, sizeof(shstrtab_header),
              shstrtab_header_offset);
   uint64 shstrtab_file_off = shstrtab_header.offset;
 
@@ -375,15 +381,15 @@ void load_bincode_from_host_elf(process *p, char *filename) {
   char name_buf[32]; // 用来存读取到的 Section 名字
 
   // 确定symtab和strtab的文件偏移
-  for (int i = 0; i < g_elfloader.ehdr.shnum; i++) {
+  for (int i = 0; i < elfloader.ehdr.shnum; i++) {
     // 1. 读取第 i 个 Section Header
-    uint64 sh_offset = g_elfloader.ehdr.shoff + i * sizeof(elf_section_header);
-    elf_fpread(&g_elfloader, &sh, sizeof(sh), sh_offset);
+    uint64 sh_offset = elfloader.ehdr.shoff + i * sizeof(elf_section_header);
+    elf_fpread(&elfloader, &sh, sizeof(sh), sh_offset);
 
     // 2. 读取这个 Section 的名字
     // 名字位于：Section名字字符串表基址 + 当前Section的name偏移
     memset(name_buf, 0, sizeof(name_buf));
-    elf_fpread(&g_elfloader, name_buf, sizeof(name_buf) - 1,
+    elf_fpread(&elfloader, name_buf, sizeof(name_buf) - 1,
                shstrtab_file_off + sh.name);
 
     // 3. 比对名字
@@ -397,19 +403,19 @@ void load_bincode_from_host_elf(process *p, char *filename) {
   }
 
   // 确定debug_line的内容，并调用make_addr_line建立地址到行号的映射
-  for (int i = 0; i < g_elfloader.ehdr.shnum; i++) {
+  for (int i = 0; i < elfloader.ehdr.shnum; i++) {
     // 1. 读取第 i 个 Section Header
-    uint64 sh_offset = g_elfloader.ehdr.shoff + i * sizeof(elf_section_header);
-    elf_fpread(&g_elfloader, &sh, sizeof(sh), sh_offset);
+    uint64 sh_offset = elfloader.ehdr.shoff + i * sizeof(elf_section_header);
+    elf_fpread(&elfloader, &sh, sizeof(sh), sh_offset);
 
     // 2. 读取这个 Section 的名字
     // 名字位于：Section名字字符串表基址 + 当前Section的name偏移
-    elf_fpread(&g_elfloader, name_buf, 32, shstrtab_file_off + sh.name);
+    elf_fpread(&elfloader, name_buf, 32, shstrtab_file_off + sh.name);
 
     // 3. 比对名字
     if (strcmp(name_buf, ".debug_line") == 0) {
-      elf_fpread(&g_elfloader, debug_line_data, sh.size, sh.offset);
-      make_addr_line(&g_elfloader, debug_line_data, sh.size);
+      elf_fpread(&elfloader, debug_line_data, sh.size, sh.offset);
+      make_addr_line(&elfloader, debug_line_data, sh.size);
     }
   }
 

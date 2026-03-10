@@ -34,6 +34,8 @@ process procs[NPROC];
 // current points to the currently running user-mode application.
 process *current = NULL;
 
+uint64 g_ufree_page = USER_FREE_ADDRESS_START;
+
 //
 // switch to a user-mode process
 //

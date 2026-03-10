@@ -48,7 +48,8 @@ ssize_t sys_user_exit(uint64 code) {
 //
 uint64 sys_user_allocate_page() {
   void *pa = alloc_page();
-  uint64 va;
+  uint64 va = g_ufree_page;
+  g_ufree_page += PGSIZE;
   // if there are previously reclaimed pages, use them first (this does not
   // change the size of the heap)
   if (current->user_heap.free_pages_count > 0) {
@@ -270,6 +271,7 @@ ssize_t sys_user_print_backtrace(uint64 depth) {
   uint64 fp = 0;
   if (read_user_u64(current->trapframe->regs.sp + 24, &fp) != 0)
     return 0;
+
   for (uint64 i = 0; i < depth && fp != 0; i++) {
     if (fp & 0x7)
       break;

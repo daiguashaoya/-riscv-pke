@@ -71,6 +71,7 @@ USER_LIB_OBJ := $(OBJ_DIR)/user/user_lib.o
 SUPPORTED_USER_APPS := \
 	app_print_backtrace \
 	app_errorline \
+	app_sum_sequence \
 # 	app_shell \
 # 	app_ls \
 # 	app_mkdir \
@@ -78,7 +79,7 @@ SUPPORTED_USER_APPS := \
 # 	app_cat \
 # 	app_echo \
 
-# 	app_sum_sequence \
+
 # 	app_wait \
 
 # 	app0 \
