@@ -22,6 +22,8 @@ static uint64 strtab_off = 0, strtab_sz = 0;
 static elf_info g_elf_info;
 static elf_ctx g_elfloader;
 
+char debug_line_data[128 * 1024];
+
 //
 // the implementation of allocater. allocates memory space for later segment loading.
 // this allocater is heavily modified @lab2_1, where we do NOT work in bare mode.
@@ -201,6 +203,23 @@ void load_bincode_from_host_elf(process *p, char *filename) {
     } else if (strcmp(name_buf, ".strtab") == 0) {
       strtab_off = sh.offset; // 找到了字符串表的文件偏移
       strtab_sz = sh.size;
+    }
+  }
+
+  // 确定debug_line的内容，并调用make_addr_line建立地址到行号的映射
+  for (int i = 0; i < g_elfloader.ehdr.shnum; i++) {
+    // 1. 读取第 i 个 Section Header
+    uint64 sh_offset = g_elfloader.ehdr.shoff + i * sizeof(elf_section_header);
+    elf_fpread(&g_elfloader, &sh, sizeof(sh), sh_offset);
+
+    // 2. 读取这个 Section 的名字
+    // 名字位于：Section名字字符串表基址 + 当前Section的name偏移
+    elf_fpread(&g_elfloader, name_buf, 32, shstrtab_file_off + sh.name);
+
+    // 3. 比对名字
+    if (strcmp(name_buf, ".debug_line") == 0) {
+      elf_fpread(&g_elfloader, debug_line_data, sh.size, sh.offset);
+      make_addr_line(&g_elfloader, debug_line_data, sh.size);
     }
   }
 
