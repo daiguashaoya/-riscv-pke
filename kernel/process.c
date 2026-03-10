@@ -157,6 +157,7 @@ process *alloc_process() {
   procs[i].user_heap.heap_top = USER_FREE_ADDRESS_START;
   procs[i].user_heap.heap_bottom = USER_FREE_ADDRESS_START;
   procs[i].user_heap.free_pages_count = 0;
+  procs[i].heap_block_head = 0;
 
   // map user heap in userspace
   procs[i].mapped_info[HEAP_SEGMENT].va = USER_FREE_ADDRESS_START;
@@ -250,6 +251,7 @@ int do_fork(process *parent) {
           parent->mapped_info[HEAP_SEGMENT].npages;
       memcpy((void *)&child->user_heap, (void *)&parent->user_heap,
              sizeof(parent->user_heap));
+      child->heap_block_head = parent->heap_block_head;
     } break;
     case CODE_SEGMENT: {
       // map child code to parent's physical code pages (shared, not copied)
@@ -374,6 +376,7 @@ int do_exec(char *path, char *para) {
   current->user_heap.heap_top = USER_FREE_ADDRESS_START;
   current->user_heap.heap_bottom = USER_FREE_ADDRESS_START;
   current->user_heap.free_pages_count = 0;
+  current->heap_block_head = 0;
   current->mapped_info[HEAP_SEGMENT].npages = 0;
 
   // Step 7: set up trapframe registers for the new program entry

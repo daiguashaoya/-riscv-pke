@@ -62,6 +62,14 @@ typedef struct process_heap_manager {
   uint32 free_pages_count;
 } process_heap_manager;
 
+// heap block metadata used by better_malloc/better_free.
+// fields are virtual-address based to keep fork copies valid.
+typedef struct mem_block_t {
+  uint64 size; // usable bytes after this header
+  uint64 used; // 0: free, 1: allocated
+  uint64 next; // virtual address of next mem_block_t, 0 if none
+} mem_block;
+
 // code file struct, including directory index and file name char pointer
 typedef struct {
     uint64 dir; char *file;
@@ -90,6 +98,8 @@ typedef struct process_t {
   // heap management
   // 用户堆管理
   process_heap_manager user_heap;
+  // head of variable-size heap block list for lab2_challenge2 merge
+  uint64 heap_block_head;
 
   // process id
   uint64 pid;

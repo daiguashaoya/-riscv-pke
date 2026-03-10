@@ -64,6 +64,21 @@ void naive_free(void *va) {
 }
 
 //
+// lib call to better_malloc (lab2_challenge2 merged path)
+//
+void *better_malloc(int size) {
+  return (void *)do_user_call(SYS_user_better_malloc, (uint64)size, 0, 0, 0, 0,
+                              0, 0);
+}
+
+//
+// lib call to better_free (lab2_challenge2 merged path)
+//
+void better_free(void *va) {
+  do_user_call(SYS_user_better_free, (uint64)va, 0, 0, 0, 0, 0, 0);
+}
+
+//
 // lib call to naive_fork
 int fork() { return do_user_call(SYS_user_fork, 0, 0, 0, 0, 0, 0, 0); }
 

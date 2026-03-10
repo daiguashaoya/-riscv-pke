@@ -81,6 +81,174 @@ uint64 sys_user_free_page(uint64 va) {
   return 0;
 }
 
+static uint64 align8(uint64 n) { return (n + 7UL) & ~7UL; }
+
+static mem_block *heap_block_from_va(uint64 va) {
+  return (mem_block *)user_va_to_pa((pagetable_t)current->pagetable, (void *)va);
+}
+
+static uint64 heap_map_one_page(process *p) {
+  if (p->mapped_info[HEAP_SEGMENT].npages >= MAX_HEAP_PAGES)
+    panic("better_malloc: heap reaches MAX_HEAP_PAGES.\n");
+
+  void *pa = alloc_page();
+  if (pa == 0)
+    panic("better_malloc: out of physical memory.\n");
+
+  memset(pa, 0, PGSIZE);
+  uint64 va = p->user_heap.heap_top;
+  user_vm_map((pagetable_t)p->pagetable, va, PGSIZE, (uint64)pa,
+              prot_to_type(PROT_WRITE | PROT_READ, 1));
+  p->user_heap.heap_top += PGSIZE;
+  p->mapped_info[HEAP_SEGMENT].npages++;
+  return va;
+}
+
+static void try_split_block(uint64 block_va, mem_block *block, uint64 want_size) {
+  if (block->size < want_size + sizeof(mem_block) + 8)
+    return;
+
+  uint64 split_va = block_va + sizeof(mem_block) + want_size;
+  uint64 split_page_end = ROUNDDOWN(split_va, PGSIZE) + PGSIZE;
+  if (split_va + sizeof(mem_block) > split_page_end)
+    return;
+  if (split_va + sizeof(mem_block) > current->user_heap.heap_top)
+    return;
+
+  mem_block *split = heap_block_from_va(split_va);
+  if (split == 0)
+    return;
+
+  split->size = block->size - want_size - sizeof(mem_block);
+  split->used = 0;
+  split->next = block->next;
+
+  block->size = want_size;
+  block->next = split_va;
+}
+
+static void merge_with_next_free(uint64 block_va, mem_block *block) {
+  while (block->next != 0) {
+    uint64 next_va = block->next;
+    mem_block *next = heap_block_from_va(next_va);
+    if (next == 0 || next->used)
+      break;
+
+    uint64 expected_next_va = block_va + sizeof(mem_block) + block->size;
+    if (expected_next_va != next_va)
+      break;
+
+    block->size += sizeof(mem_block) + next->size;
+    block->next = next->next;
+  }
+}
+
+// variable-size allocator merged from lab2_challenge2 design.
+uint64 sys_user_better_malloc(uint64 n) {
+  if (n == 0)
+    return 0;
+  n = align8(n);
+
+  if (current->heap_block_head == 0) {
+    uint64 first_block_va = heap_map_one_page(current);
+    mem_block *first = heap_block_from_va(first_block_va);
+    kassert(first != 0);
+    first->size = PGSIZE - sizeof(mem_block);
+    first->used = 0;
+    first->next = 0;
+    current->heap_block_head = first_block_va;
+  }
+
+  for (;;) {
+    uint64 cur_va = current->heap_block_head;
+    uint64 tail_va = 0;
+
+    while (cur_va != 0) {
+      mem_block *cur = heap_block_from_va(cur_va);
+      if (cur == 0)
+        panic("better_malloc: invalid heap block header.\n");
+      tail_va = cur_va;
+
+      if (!cur->used && cur->size >= n) {
+        try_split_block(cur_va, cur, n);
+        cur->used = 1;
+        return cur_va + sizeof(mem_block);
+      }
+
+      cur_va = cur->next;
+    }
+
+    kassert(tail_va != 0);
+    mem_block *tail = heap_block_from_va(tail_va);
+    kassert(tail != 0);
+
+    // If the tail block is free, grow it in-place by mapping more pages.
+    if (!tail->used && tail->next == 0) {
+      while (tail->size < n) {
+        heap_map_one_page(current);
+        tail->size += PGSIZE;
+      }
+      continue;
+    }
+
+    // Otherwise append a brand-new free block at current heap top.
+    uint64 need_bytes = n + sizeof(mem_block);
+    uint64 pages_needed = (need_bytes + PGSIZE - 1) / PGSIZE;
+    uint64 new_block_va = current->user_heap.heap_top;
+    for (uint64 i = 0; i < pages_needed; i++)
+      heap_map_one_page(current);
+
+    mem_block *new_block = heap_block_from_va(new_block_va);
+    kassert(new_block != 0);
+    new_block->size = pages_needed * PGSIZE - sizeof(mem_block);
+    new_block->used = 0;
+    new_block->next = 0;
+    tail->next = new_block_va;
+  }
+}
+
+uint64 sys_user_better_free(uint64 va) {
+  if (va == 0)
+    return 0;
+  if (current->heap_block_head == 0)
+    return -1;
+  if (va < current->user_heap.heap_bottom + sizeof(mem_block) ||
+      va >= current->user_heap.heap_top)
+    return -1;
+
+  uint64 target_va = va - sizeof(mem_block);
+  uint64 prev_va = 0;
+  uint64 cur_va = current->heap_block_head;
+  mem_block *cur = 0;
+  while (cur_va != 0) {
+    cur = heap_block_from_va(cur_va);
+    if (cur == 0)
+      return -1;
+    if (cur_va == target_va)
+      break;
+    prev_va = cur_va;
+    cur_va = cur->next;
+  }
+  if (cur_va == 0 || cur == 0)
+    return -1;
+
+  cur->used = 0;
+  merge_with_next_free(cur_va, cur);
+
+  if (prev_va != 0) {
+    mem_block *prev = heap_block_from_va(prev_va);
+    if (prev != 0 && !prev->used) {
+      uint64 expected_cur_va = prev_va + sizeof(mem_block) + prev->size;
+      if (expected_cur_va == cur_va) {
+        prev->size += sizeof(mem_block) + cur->size;
+        prev->next = cur->next;
+      }
+    }
+  }
+
+  return 0;
+}
+
 //
 // kerenl entry point of naive_fork
 //
@@ -311,6 +479,10 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
     return sys_user_fork();
   case SYS_user_yield:
     return sys_user_yield();
+  case SYS_user_better_malloc:
+    return sys_user_better_malloc(a1);
+  case SYS_user_better_free:
+    return sys_user_better_free(a1);
   // added @lab4_1
   case SYS_user_open:
     return sys_user_open((char *)a1, a2);

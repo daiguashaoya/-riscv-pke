@@ -72,6 +72,8 @@ SUPPORTED_USER_APPS := \
 	app_print_backtrace \
 	app_errorline \
 	app_sum_sequence \
+	app_singlepageheap \
+	
 # 	app_shell \
 # 	app_ls \
 # 	app_mkdir \
