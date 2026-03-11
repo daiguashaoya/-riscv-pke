@@ -38,6 +38,10 @@ int unlink_u(const char *fn);
 // lab1 challenge1
 int print_backtrace(int depth);
 
+int sem_new(int value);
+void sem_P(int sem_id);
+void sem_V(int sem_id);
+
 // added @ lab4_challenge3
 int exec(const char *path, const char *para);
 int wait(int pid);

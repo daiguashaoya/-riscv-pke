@@ -20,6 +20,10 @@
 #define SYS_user_better_malloc (SYS_user_base + 7)
 #define SYS_user_better_free (SYS_user_base + 8)
 
+#define SYS_user_sem_new (SYS_user_base + 9)
+#define SYS_user_sem_P (SYS_user_base + 10)
+#define SYS_user_sem_V (SYS_user_base + 11)
+
 // added @lab4_1
 #define SYS_user_open (SYS_user_base + 17)
 #define SYS_user_read (SYS_user_base + 18)

@@ -185,6 +185,19 @@ int print_backtrace(int depth) {
 // lib call to exec: replace current process image with a new program.
 // path: path to the ELF file; para: single argument string.
 //
+
+int sem_new(int value) {
+  return do_user_call(SYS_user_sem_new, value, 0, 0, 0, 0, 0, 0);
+}
+
+void sem_P(int sem_id) {
+  do_user_call(SYS_user_sem_P, sem_id, 0, 0, 0, 0, 0, 0);
+}
+
+void sem_V(int sem_id) {
+  do_user_call(SYS_user_sem_V, sem_id, 0, 0, 0, 0, 0, 0);
+}
+
 int exec(const char *path, const char *para) {
   return do_user_call(SYS_user_exec, (uint64)path, (uint64)para, 0, 0, 0, 0, 0);
 }

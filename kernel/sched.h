@@ -8,5 +8,7 @@
 
 void insert_to_ready_queue( process* proc );
 void schedule();
+void insert_to_wait_queue(process **queue_head, process *proc);
+process *pop_from_wait_queue(process **queue_head);
 
 #endif

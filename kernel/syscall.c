@@ -15,6 +15,7 @@
 #include "util/functions.h"
 #include "util/types.h"
 #include "vmm.h"
+#include "semaphore.h"
 
 #include "spike_interface/spike_utils.h"
 
@@ -463,6 +464,12 @@ ssize_t sys_user_print_backtrace(uint64 depth) {
   return 0;
 }
 
+ssize_t sys_user_sem_new(int value) { return do_sem_new(value); }
+
+ssize_t sys_user_sem_P(int sem_id) { return do_sem_P(sem_id); }
+
+ssize_t sys_user_sem_V(int sem_id) { return do_sem_V(sem_id); } 
+
 long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
                 long a7) {
   switch (a0) {
@@ -519,6 +526,12 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
     return sys_user_wait((int)a1);
   case SYS_user_print_backtrace:
     return sys_user_print_backtrace(a1);
+  case SYS_user_sem_new:
+    return sys_user_sem_new(a1);
+  case SYS_user_sem_P:
+    return sys_user_sem_P(a1);
+  case SYS_user_sem_V:
+    return sys_user_sem_V(a1);
   default:
     panic("Unknown syscall %ld \n", a0);
   }
