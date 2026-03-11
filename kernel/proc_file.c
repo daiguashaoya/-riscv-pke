@@ -221,3 +221,71 @@ int do_link(char *oldpath, char *newpath) {
 int do_unlink(char *path) {
   return vfs_unlink(path);
 }
+
+// 经过 user_va_to_pa 函数的转换之后 ，这里的path就是字符串的实际物理地址
+int do_rcwd(char *path) {
+  // 从当前的 cwd dentry 向上遍历到根目录，构建路径字符串
+  struct dentry *d = current->pfiles->cwd;
+
+  // 如果是根目录
+  if (d->parent == NULL || d == vfs_root_dentry) {
+    strcpy(path, "/");
+    return 0;
+  }
+
+  // 从当前目录向上遍历，收集路径
+  char temp[MAX_PATH_LEN];
+  temp[0] = '\0';
+
+  while (d != NULL && d != vfs_root_dentry) {
+    char segment[MAX_PATH_LEN];
+    strcpy(segment, "/");
+    strcat(segment, d->name);
+    // temp是目前的目录，segment是当前目录的父目录，所以接到后面
+    strcat(segment, temp);
+    strcpy(temp, segment);
+    d = d->parent;
+  }
+
+  if (temp[0] == '\0') {
+    strcpy(path, "/");
+  } else {
+    strcpy(path, temp);
+  }
+
+  return 0;
+}
+//
+// 改变当前工作目录
+//
+int do_ccwd(const char *path) {
+  // 默认是./格式，从当前目录开始
+  struct dentry *parent = current->pfiles->cwd;
+  char miss_name[MAX_PATH_LEN];
+
+  // 如果是绝对路径，从根目录开始
+  if (path[0] == '/') {
+    parent = vfs_root_dentry;
+  }
+  // // 如果是../格式，从当前目录的父目录开始
+  // if (path[0] == '.' && path[1] == '.') {
+  //   parent = parent->parent;
+  // }
+
+  // 查找目标目录
+  struct dentry *target = lookup_final_dentry(path, &parent, miss_name);
+
+  if (target == NULL) {
+    sprint("do_change_cwd: directory not found!\n");
+    return -1;
+  }
+
+  if (target->dentry_inode->type != DIR_I) {
+    sprint("do_change_cwd: not a directory!\n");
+    return -1;
+  }
+
+  // 更新当前工作目录，在这里真正实现cd 的 功能
+  current->pfiles->cwd = target;
+  return 0;
+}

@@ -44,6 +44,9 @@ void sem_V(int sem_id);
 
 void printpa(int* va);
 
+int read_cwd(char *path);
+int change_cwd(const char *path);
+
 // added @ lab4_challenge3
 int exec(const char *path, const char *para);
 int wait(int pid);

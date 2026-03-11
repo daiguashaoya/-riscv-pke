@@ -9,12 +9,28 @@
 #include "util/string.h"
 #include "util/types.h"
 #include "util/hash_table.h"
+#include "process.h"
 
 struct dentry *vfs_root_dentry;               // system root direntry
 struct super_block *vfs_sb_list[MAX_MOUNTS];  // system superblock list
 struct device *vfs_dev_list[MAX_VFS_DEV];     // system device list in vfs layer
 struct hash_table dentry_hash_table;
 struct hash_table vinode_hash_table;
+
+// current is unavailable before the first process is scheduled.
+// Keep relative-path behavior for user syscalls, but fall back to root during
+// early kernel boot loading.
+static int has_process_cwd(void) {
+  uint64 cur = (uint64)current;
+  uint64 start = (uint64)&procs[0];
+  uint64 end = (uint64)&procs[NPROC];
+
+  if (cur < start || cur >= end)
+    return 0;
+  if (current->pfiles == NULL || current->pfiles->cwd == NULL)
+    return 0;
+  return 1;
+}
 
 //
 // initializes the dentry hash list and vinode hash list
@@ -110,6 +126,11 @@ struct super_block *vfs_mount(const char *dev_name, int mnt_type) {
 //
 struct file *vfs_open(const char *path, int flags) {
   struct dentry *parent = vfs_root_dentry; // we start the path lookup from root.
+  
+  if (path[0] != '/' && has_process_cwd()) {
+    parent = current->pfiles->cwd;
+  }
+
   char miss_name[MAX_PATH_LEN];
 
   // path lookup.
@@ -400,6 +421,11 @@ int vfs_close(struct file *file) {
 //
 struct file *vfs_opendir(const char *path) {
   struct dentry *parent = vfs_root_dentry;
+  
+  if (path[0] != '/' && has_process_cwd()) {
+    parent = current->pfiles->cwd;
+  }
+
   char miss_name[MAX_PATH_LEN];
 
   // lookup the dir
@@ -444,6 +470,11 @@ int vfs_readdir(struct file *file, struct dir *dir) {
 //
 int vfs_mkdir(const char *path) {
   struct dentry *parent = vfs_root_dentry;
+
+  if (path[0] != '/' && has_process_cwd()) {
+    parent = current->pfiles->cwd;
+  }
+
   char miss_name[MAX_PATH_LEN];
 
   // lookup the dir, find its parent direntry
@@ -522,8 +553,21 @@ struct dentry *lookup_final_dentry(const char *path, struct dentry **parent,
   struct dentry *this = *parent;
 
   while (token != NULL) {
+    if (strcmp(token, ".") == 0) {
+      token = strtok(NULL, "/");
+      continue;
+    }
+    if (strcmp(token, "..") == 0) {
+      // ".." 表示父目录，需要回退！
+      if (this->parent != NULL) {
+        this = this->parent; // ← 关键：回到父目录
+      }
+      token = strtok(NULL, "/");
+      continue;
+    }
     *parent = this;
-    this = hash_get_dentry((*parent), token);  // try hash first
+
+    this = hash_get_dentry((*parent), token); // try hash first
     if (this == NULL) {
       // if not found in hash, try to find it in the directory
       this = alloc_vfs_dentry(token, NULL, *parent);
@@ -537,9 +581,11 @@ struct dentry *lookup_final_dentry(const char *path, struct dentry **parent,
         return NULL;
       }
 
-      struct vinode *same_inode = hash_get_vinode(found_vinode->sb, found_vinode->inum);
+      struct vinode *same_inode =
+          hash_get_vinode(found_vinode->sb, found_vinode->inum);
       if (same_inode != NULL) {
-        // the vinode is already in the hash table (i.e. we are opening another hard link)
+        // the vinode is already in the hash table (i.e. we are opening another
+        // hard link)
         this->dentry_inode = same_inode;
         same_inode->ref++;
         free_page(found_vinode);

@@ -477,6 +477,15 @@ ssize_t sys_user_printpa(uint64 va)
   return 0;
 }
 
+ssize_t sys_user_rcwd(char * vfn){
+  char * pfn = (char*)user_va_to_pa((pagetable_t)(current->pagetable), (void*)vfn);
+  return do_rcwd(pfn);
+}
+
+ssize_t sys_user_ccwd(char * vfn){
+  char * pfn = (char*)user_va_to_pa((pagetable_t)(current->pagetable), (void*)vfn);
+  return do_ccwd(pfn);
+}
 
 long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
                 long a7) {
@@ -542,6 +551,10 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
     return sys_user_sem_V(a1);
   case SYS_user_printpa:
     return sys_user_printpa(a1);
+  case SYS_user_rcwd:
+    return sys_user_rcwd((char *)a1);
+  case SYS_user_ccwd:
+    return sys_user_ccwd((char *)a1);
   default:
     panic("Unknown syscall %ld \n", a0);
   }

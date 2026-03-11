@@ -26,6 +26,9 @@
 
 #define SYS_user_printpa (SYS_user_base + 12)
 
+#define SYS_user_rcwd (SYS_user_base + 13)
+#define SYS_user_ccwd (SYS_user_base + 14)
+
 // added @lab4_1
 #define SYS_user_open (SYS_user_base + 17)
 #define SYS_user_read (SYS_user_base + 18)
