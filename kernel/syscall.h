@@ -24,6 +24,8 @@
 #define SYS_user_sem_P (SYS_user_base + 10)
 #define SYS_user_sem_V (SYS_user_base + 11)
 
+#define SYS_user_printpa (SYS_user_base + 12)
+
 // added @lab4_1
 #define SYS_user_open (SYS_user_base + 17)
 #define SYS_user_read (SYS_user_base + 18)

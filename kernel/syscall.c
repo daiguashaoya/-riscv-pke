@@ -470,6 +470,14 @@ ssize_t sys_user_sem_P(int sem_id) { return do_sem_P(sem_id); }
 
 ssize_t sys_user_sem_V(int sem_id) { return do_sem_V(sem_id); } 
 
+ssize_t sys_user_printpa(uint64 va)
+{
+  uint64 pa = (uint64)user_va_to_pa((pagetable_t)(current->pagetable), (void*)va);
+  sprint("%lx\n", pa);
+  return 0;
+}
+
+
 long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
                 long a7) {
   switch (a0) {
@@ -532,6 +540,8 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
     return sys_user_sem_P(a1);
   case SYS_user_sem_V:
     return sys_user_sem_V(a1);
+  case SYS_user_printpa:
+    return sys_user_printpa(a1);
   default:
     panic("Unknown syscall %ld \n", a0);
   }

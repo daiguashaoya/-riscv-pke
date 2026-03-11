@@ -75,6 +75,7 @@ SUPPORTED_USER_APPS := \
 	app_singlepageheap \
 	app_wait \
 	app_semaphore \
+	app_cow \
 
 # 	app_shell \
 # 	app_ls \

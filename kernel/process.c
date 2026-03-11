@@ -227,33 +227,55 @@ int do_fork(process *parent) {
              PGSIZE);
       break;
     // 复制用了的堆页 (added @lab4_challenge3)
-    case HEAP_SEGMENT: {
-      // build a same heap for child by copying every live heap page
-      int free_block_filter[MAX_HEAP_PAGES];
-      memset(free_block_filter, 0, sizeof(free_block_filter));
-      uint64 heap_bottom = parent->user_heap.heap_bottom;
-      for (int j = 0; j < (int)parent->user_heap.free_pages_count; j++) {
-        int idx =
-            (int)((parent->user_heap.free_pages_address[j] - heap_bottom) /
-                  PGSIZE);
-        free_block_filter[idx] = 1;
+    case HEAP_SEGMENT:
+      //   // build a same heap for child process.
+
+      // convert free_pages_address into a filter to skip reclaimed blocks in
+      // the heap when mapping the heap blocks
+      {
+        int free_block_filter[MAX_HEAP_PAGES];
+        memset(free_block_filter, 0, MAX_HEAP_PAGES);
+        uint64 heap_bottom = parent->user_heap.heap_bottom;
+        for (int i = 0; i < parent->user_heap.free_pages_count; i++) {
+          int index =
+              (parent->user_heap.free_pages_address[i] - heap_bottom) / PGSIZE;
+          free_block_filter[index] = 1;
+        }
+
+        // copy and map the heap blocks
+        for (uint64 heap_block = current->user_heap.heap_bottom;
+             heap_block < current->user_heap.heap_top; heap_block += PGSIZE) {
+          if (free_block_filter[(heap_block - heap_bottom) /
+                                PGSIZE]) // skip free blocks
+            continue;
+
+          // ===== 修改为COW写保护与引用技术逻辑 =====
+          // 获取父进程对应的物理页
+          void *pa = (void *)lookup_pa(parent->pagetable, heap_block);
+
+          // 物理页多了一个子进程映射共享，增加引用数计数
+          inc_page_ref(pa);
+
+          // 修改父进程PTE，剥夺写权限，打上 COW 标记
+          pte_t *pte_parent = page_walk(parent->pagetable, heap_block, 0);
+          *pte_parent = (*pte_parent & ~PTE_W) | PTE_COW;
+
+          // 为子进程添加该页面的映射，采用只读权限 PROT_READ
+          user_vm_map((pagetable_t)child->pagetable, heap_block, PGSIZE,
+                      (uint64)pa, prot_to_type(PROT_READ, 1));
+
+          // 由于 user_vm_map 默认不会带 PTE_COW 标记，我们需要手动获取并打上
+          pte_t *pte_child =
+              page_walk((pagetable_t)child->pagetable, heap_block, 0);
+          *pte_child |= PTE_COW;
+          // ===== 修改结束 =====
+        }
+        // copy the heap manager from parent to child
+        memcpy((void *)&child->user_heap, (void *)&parent->user_heap,
+               sizeof(parent->user_heap));
+        flush_tlb(); // 刷新 TLB
+        break;
       }
-      for (uint64 hb = parent->user_heap.heap_bottom;
-           hb < parent->user_heap.heap_top; hb += PGSIZE) {
-        int idx = (int)((hb - heap_bottom) / PGSIZE);
-        if (free_block_filter[idx])
-          continue; // skip freed pages
-        void *child_pa = alloc_page();
-        memcpy(child_pa, (void *)lookup_pa(parent->pagetable, hb), PGSIZE);
-        user_vm_map((pagetable_t)child->pagetable, hb, PGSIZE, (uint64)child_pa,
-                    prot_to_type(PROT_WRITE | PROT_READ, 1));
-      }
-      child->mapped_info[HEAP_SEGMENT].npages =
-          parent->mapped_info[HEAP_SEGMENT].npages;
-      memcpy((void *)&child->user_heap, (void *)&parent->user_heap,
-             sizeof(parent->user_heap));
-      child->heap_block_head = parent->heap_block_head;
-    } break;
     case CODE_SEGMENT: {
       // map child code to parent's physical code pages (shared, not copied)
       uint64 code_pa = lookup_pa(parent->pagetable, parent->mapped_info[i].va);

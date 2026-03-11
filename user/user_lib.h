@@ -42,6 +42,8 @@ int sem_new(int value);
 void sem_P(int sem_id);
 void sem_V(int sem_id);
 
+void printpa(int* va);
+
 // added @ lab4_challenge3
 int exec(const char *path, const char *para);
 int wait(int pid);

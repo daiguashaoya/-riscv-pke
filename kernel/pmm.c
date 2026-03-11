@@ -22,6 +22,20 @@ typedef struct node {
 // g_free_mem_list is the head of the list of free physical memory pages
 static list_node g_free_mem_list;
 
+// 假设物理内存页数不会超过一定上限（这里开辟了512MB/4KB = 131072
+// 个字节数组来记录引用数）
+static uint8 page_ref[131072];
+
+void inc_page_ref(void *pa) {
+  uint64 index = ((uint64)pa - free_mem_start_addr) / PGSIZE;
+  page_ref[index]++;
+}
+
+int get_page_ref(void *pa) {
+  uint64 index = ((uint64)pa - free_mem_start_addr) / PGSIZE;
+  return page_ref[index];
+}
+
 //
 // actually creates the freepage list. each page occupies 4KB (PGSIZE), i.e., small page.
 // PGSIZE is defined in kernel/riscv.h, ROUNDUP is defined in util/functions.h.
@@ -35,25 +49,34 @@ static void create_freepage_list(uint64 start, uint64 end) {
 //
 // place a physical page at *pa to the free list of g_free_mem_list (to reclaim the page)
 //
+void *alloc_page(void) {
+  list_node *n = g_free_mem_list.next;
+  if (n) {
+    g_free_mem_list.next = n->next;
+    // ===== 新增开始 =====
+    page_ref[((uint64)n - free_mem_start_addr) / PGSIZE] = 1;
+    // ===== 新增结束 =====
+  }
+  return (void *)n;
+}
+
 void free_page(void *pa) {
-  if (((uint64)pa % PGSIZE) != 0 || (uint64)pa < free_mem_start_addr || (uint64)pa >= free_mem_end_addr)
+  if (((uint64)pa % PGSIZE) != 0 || (uint64)pa < free_mem_start_addr ||
+      (uint64)pa >= free_mem_end_addr)
     panic("free_page 0x%lx \n", pa);
+
+  // ===== 新增开始 =====
+  uint64 index = ((uint64)pa - free_mem_start_addr) / PGSIZE;
+  if (page_ref[index] > 0)
+    page_ref[index]--;
+  if (page_ref[index] > 0)
+    return; // 还有其它进程正在使用(COW共享)，不能回收
+  // ===== 新增结束 =====
 
   // insert a physical page to g_free_mem_list
   list_node *n = (list_node *)pa;
   n->next = g_free_mem_list.next;
   g_free_mem_list.next = n;
-}
-
-//
-// takes the first free page from g_free_mem_list, and returns (allocates) it.
-// Allocates only ONE page!
-//
-void *alloc_page(void) {
-  list_node *n = g_free_mem_list.next;
-  if (n) g_free_mem_list.next = n->next;
-
-  return (void *)n;
 }
 
 //

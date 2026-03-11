@@ -11,6 +11,7 @@
 #include "sched.h"
 #include "util/functions.h"
 #include "memlayout.h"
+#include "string.h"
 
 
 #include "spike_interface/spike_utils.h"
@@ -57,6 +58,30 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval) {
   sprint("handle_page_fault: %lx\n", stval);
   switch (mcause) {
     case CAUSE_STORE_PAGE_FAULT:
+    // 首先检查是否是因为 COW 引发的页错误
+    pte_t *pte = page_walk(current->pagetable, stval, 0);
+    if (pte != 0 && (*pte & PTE_V) && (*pte & PTE_COW)) {
+      // 这是 COW 造成的异常
+      uint64 pa = PTE2PA(*pte); // 之前被共享的旧的物理地址
+
+      // 尝试分配新的一页物理内存
+      void *new_pa = alloc_page();
+      if (new_pa == 0)
+        panic("COW: out of memory");
+
+      // 拷贝原物理页的内容到新的物理页
+      memcpy(new_pa, (void *)ROUNDDOWN((uint64)pa, PGSIZE), PGSIZE);
+
+      // 重新设置该页的PTE，去掉 COW 标志，并加上 PTE_W 允许当前进程合法写操作
+      *pte = PA2PTE(new_pa) | ((PTE_FLAGS(*pte) | PTE_W | PTE_D | PTE_A) & ~PTE_COW);
+
+      // 最后释放对原来旧共享页面的引用计数，如果只剩1个引用则通过底层自动收回真正空间
+      free_page((void *)pa);
+
+      // 刷新 TLB 生效变更
+      flush_tlb();
+      break; // 放行操作，让其重试缺页触发的当前行指令即可
+    }
       // TODO (lab2_3): implement the operations that solve the page fault to
       // dynamically increase application stack.
       // hint: first allocate a new physical page, and then, maps the new page to the
