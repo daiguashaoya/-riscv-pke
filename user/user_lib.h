@@ -48,7 +48,14 @@ int read_cwd(char *path);
 int change_cwd(const char *path);
 
 // added @ lab4_challenge3
-int exec(const char *path, const char *para);
+// Two-arg exec implementation.
+int exec_with_para(const char *path, const char *para);
+// One-arg exec wrapper: use `path` itself as argv[0] default string.
+int exec_default(const char *path);
+
+// Support both `exec(path)` and `exec(path, para)`.
+#define _EXEC_SELECT(_1, _2, NAME, ...) NAME
+#define exec(...) _EXEC_SELECT(__VA_ARGS__, exec_with_para, exec_default)(__VA_ARGS__)
 int wait(int pid);
 
 #endif

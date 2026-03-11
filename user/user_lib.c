@@ -214,9 +214,14 @@ int change_cwd(const char *path) {
   return do_user_call(SYS_user_ccwd, (uint64)path, 0, 0, 0, 0, 0, 0);
 }
 
-int exec(const char *path, const char *para) {
+int exec_with_para(const char *path, const char *para) {
+  // Default fallback keeps exec robust if caller explicitly passes NULL.
+  if (para == 0)
+    para = path;
   return do_user_call(SYS_user_exec, (uint64)path, (uint64)para, 0, 0, 0, 0, 0);
 }
+
+int exec_default(const char *path) { return exec_with_para(path, path); }
 
 //
 // lib call to wait: parent waits for child process (pid) to finish.

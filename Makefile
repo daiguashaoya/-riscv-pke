@@ -77,6 +77,8 @@ SUPPORTED_USER_APPS := \
 	app_semaphore \
 	app_cow \
 	app_relativepath \
+	app_exec \
+	app_ls \
 
 # 	app_shell \
 # 	app_ls \
