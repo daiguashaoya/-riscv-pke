@@ -187,10 +187,23 @@ struct vinode *hostfs_lookup(struct vinode *parent, struct dentry *sub_dentry) {
   get_path_string(path, sub_dentry);
 
   spike_file_t *f = spike_file_open(path, O_RDWR, 0);
+  if ((int64)f < 0) {
+    // On hostfs, opening a directory with O_RDWR may fail. Retry with
+    // O_RDONLY so we can still fstat() it and distinguish dir vs missing path.
+    f = spike_file_open(path, O_RDONLY, 0);
+  }
+  if ((int64)f < 0) {
+    // Path truly does not exist (or is not openable): report lookup miss.
+    return NULL;
+  }
 
   struct vinode *child_inode = hostfs_alloc_vinode(parent->sb);
   child_inode->i_fs_info = f;
-  hostfs_update_vinode(child_inode);
+  if (hostfs_update_vinode(child_inode) != 0) {
+    spike_file_close(f);
+    free_page(child_inode);
+    return NULL;
+  }
 
   child_inode->ref = 0;
   return child_inode;
@@ -261,11 +274,15 @@ struct vinode *hostfs_mkdir(struct vinode *parent, struct dentry *sub_dentry) {
 // open a hostfs file (after having its vfs inode).
 //
 int hostfs_hook_open(struct vinode *f_inode, struct dentry *f_dentry) {
-  if (f_inode->i_fs_info != NULL) return 0;
+  if (f_inode->i_fs_info != NULL && (int64)f_inode->i_fs_info >= 0) return 0;
 
   char path[MAX_PATH_LEN];
   get_path_string(path, f_dentry);
   spike_file_t *f = spike_file_open(path, O_RDWR, 0);
+  if ((int64)f < 0) {
+    // Keep exec/open usable for read-only files.
+    f = spike_file_open(path, O_RDONLY, 0);
+  }
   if ((int64)f < 0) {
     sprint("hostfs_hook_open cannot open the given file.\n");
     return -1;

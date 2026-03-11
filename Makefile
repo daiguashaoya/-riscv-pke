@@ -78,7 +78,12 @@ SUPPORTED_USER_APPS := \
 	app_cow \
 	app_relativepath \
 	app_exec \
+	app_shell \
 	app_ls \
+	app_mkdir \
+	app_touch \
+	app_cat \
+	app_echo \
 
 # 	app_shell \
 # 	app_ls \
