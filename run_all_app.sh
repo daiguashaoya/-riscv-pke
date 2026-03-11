@@ -1,6 +1,5 @@
 #!/bin/bash
-make clean
-make
+make clean;make NCPU=1
 
 echo
 echo -e "\033[1;34m>>> spike ./obj/riscv-pke bin/app_print_backtrace\033[0m"
@@ -41,4 +40,14 @@ echo
 
 echo -e "\033[1;34m>>> spike ./obj/riscv-pke bin/app_shell\033[0m"
 spike ./obj/riscv-pke bin/app_shell
+echo
+
+make clean;make NCPU=2
+
+echo -e "\033[1;34m>>> spike -p2 ./obj/riscv-pke bin/app0 bin/app1\033[0m"
+spike -p2 ./obj/riscv-pke bin/app0 bin/app1
+echo
+
+echo -e "\033[1;34m>>> spike -p2 ./obj/riscv-pke bin/app_alloc0 bin/app_alloc1\033[0m"
+spike -p2 ./obj/riscv-pke bin/app_alloc0 bin/app_alloc1
 echo

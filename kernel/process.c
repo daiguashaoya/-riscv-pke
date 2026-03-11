@@ -31,8 +31,8 @@ extern char trap_sec_start[];
 // process pool. added @lab3_1
 process procs[NPROC];
 
-// current points to the currently running user-mode application.
-process *current = NULL;
+// per-hart current process pointer.
+process *g_current[NCPU] = {NULL};
 
 uint64 g_ufree_page = USER_FREE_ADDRESS_START;
 
@@ -121,6 +121,8 @@ process *alloc_process() {
       (uint64)alloc_page(); // phisical address of user stack bottom
   procs[i].trapframe->regs.sp =
       USER_STACK_TOP; // virtual address of user stack top
+  // keep per-hart identity across user<->kernel transitions
+  procs[i].trapframe->regs.tp = get_hartid();
 
   // allocates a page to record memory regions (segments)
   procs[i].mapped_info = (mapped_region *)alloc_page();

@@ -22,6 +22,40 @@
 //
 extern char trap_sec_start[];
 
+// S-mode init barriers (one-shot counters).
+static volatile int s_stage1_count = 0;
+static volatile int s_stage2_count = 0;
+// Serialize boot-time ELF loading across harts to avoid races on global VFS
+// caches and process-pool allocation (which are lock-free in this lab code).
+static volatile int s_load_turn = 0;
+
+static inline void boot_barrier(volatile int *counter) {
+  __sync_fetch_and_add(counter, 1);
+  while (*counter < NCPU)
+    ;
+  __sync_synchronize();
+}
+
+static int starts_with(const char *s, const char *prefix) {
+  while (*prefix) {
+    if (*s == '\0' || *s != *prefix)
+      return 0;
+    s++;
+    prefix++;
+  }
+  return 1;
+}
+
+static const char *path_basename(const char *path) {
+  const char *base = path;
+  while (*path) {
+    if (*path == '/')
+      base = path + 1;
+    path++;
+  }
+  return base;
+}
+
 //
 // turn on paging. added @lab2_1
 //
@@ -63,10 +97,11 @@ static size_t parse_args(arg_buf *arg_bug_msg) {
 // load the elf, and construct a "process" (with only a trapframe).
 // load_bincode_from_host_elf is defined in elf.c
 //
-process* load_user_program() {
+process *load_user_program(int hartid) {
   process* proc;
 
   proc = alloc_process();
+  proc->trapframe->regs.tp = hartid;
   sprint("User application is loading.\n");
 
   arg_buf arg_bug_msg;
@@ -75,7 +110,25 @@ process* load_user_program() {
   size_t argc = parse_args(&arg_bug_msg);
   if (!argc) panic("You need to specify the application program!\n");
 
-  load_bincode_from_host_elf(proc, arg_bug_msg.argv[0]);
+  if ((size_t)hartid >= argc)
+    panic("Not enough application programs specified for hart %d!\n", hartid);
+
+  const char *app_arg = arg_bug_msg.argv[hartid];
+  char resolved_path[MAX_PATH_LEN];
+  const char *load_path = app_arg;
+
+  // compatibility for lab1_challenge3 command style:
+  //   spike ... obj/app0 obj/app1
+  // challengeX loader opens apps through VFS rooted at hostfs_root, so map
+  // obj/<name> to bin/<name>.
+  if (starts_with(app_arg, "./obj/") || starts_with(app_arg, "obj/")) {
+    const char *base = path_basename(app_arg);
+    strcpy(resolved_path, "bin/");
+    strcat(resolved_path, base);
+    load_path = resolved_path;
+  }
+
+  load_bincode_from_host_elf(proc, (char *)load_path);
   return proc;
 }
 
@@ -83,34 +136,43 @@ process* load_user_program() {
 // s_start: S-mode entry point of riscv-pke OS kernel.
 //
 int s_start(void) {
-  sprint("Enter supervisor mode...\n");
-  // in the beginning, we use Bare mode (direct) memory mapping as in lab1.
-  // but now, we are going to switch to the paging mode @lab2_1.
-  // note, the code still works in Bare mode when calling pmm_init() and kern_vm_init().
-  write_csr(satp, 0);
+  int hartid = get_hartid();
+  sprint("hartid = %d: Enter supervisor mode...\n", hartid);
 
-  // init phisical memory manager
-  pmm_init();
+  if (hartid == 0) {
+    // Bare mode first. Paging will be enabled on all harts after page tables
+    // are ready.
+    write_csr(satp, 0);
+    pmm_init();
+    kern_vm_init();
+  }
+  boot_barrier(&s_stage1_count);
 
-  // build the kernel page table
-  kern_vm_init();
-
-  // now, switch to paging mode by turning on paging (SV39)
+  // Every hart must switch its own satp.
   enable_paging();
-  // the code now formally works in paging mode, meaning the page table is now in use.
-  sprint("kernel page table is on \n");
 
-  // added @lab3_1
-  init_proc_pool();
+  if (hartid == 0) {
+    sprint("kernel page table is on \n");
+    init_proc_pool();
+    fs_init();
+  }
+  boot_barrier(&s_stage2_count);
 
-  // init file system, added @lab4_1
-  fs_init();
+  sprint("hartid = %d: Switch to user mode...\n", hartid);
+  if (NCPU == 1) {
+    insert_to_ready_queue(load_user_program(hartid));
+    schedule();
+  } else {
+    // boot-time serialization: hart0 loads first, then hart1, ...
+    while (s_load_turn != hartid)
+      ;
+    process *proc = load_user_program(hartid);
+    __sync_synchronize();
+    s_load_turn++;
 
-  sprint("Switch to user mode...\n");
-  // the application code (elf) is first loaded into memory, and then put into execution
-  // added @lab3_1
-  insert_to_ready_queue( load_user_program() );
-  schedule();
+    proc->status = RUNNING;
+    switch_to(proc);
+  }
 
   // we should never reach here.
   return 0;

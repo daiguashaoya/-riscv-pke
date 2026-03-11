@@ -141,11 +141,23 @@ int do_exec(char *path, char *para);
 // added @lab4_challenge3
 int do_wait(int pid);
 
-// current running process
-extern process *current;
+// process pool
 extern process procs[NPROC];
+
+// returns the hartid of the current hart using the tp register (set in
+// mentry.S)
+static inline int get_hartid() {
+  int id;
+  asm volatile("mv %0, tp" : "=r"(id));
+  return id;
+}
 
 // address of the first free page in our simple heap. added @lab2_2
 extern uint64 g_ufree_page;
+
+// per-hart current process pointer array
+extern process *g_current[NCPU];
+// Keep legacy call sites unchanged: `current` means "this hart's current proc".
+#define current (g_current[get_hartid()])
 
 #endif

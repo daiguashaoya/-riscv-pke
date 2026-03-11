@@ -26,22 +26,52 @@ ssize_t sys_user_print(const char *buf, size_t n) {
   // buf is now an address in user space of the given app's user stack,
   // so we have to transfer it into phisical address (kernel is running in
   // direct mapping).
-  assert(current);
+  int hartid = get_hartid();
   char *pa =
       (char *)user_va_to_pa((pagetable_t)(current->pagetable), (void *)buf);
-  sprint(pa);
+  if (pa == NULL)
+    return -1;
+  sprint("hartid = %d: %s", hartid, pa);
   return 0;
 }
+
+#if NCPU > 1
+static volatile int g_finished_harts = 0;
+static volatile int g_exit_code = 0;
+#endif
 
 //
 // implement the SYS_user_exit syscall
 //
 ssize_t sys_user_exit(uint64 code) {
+#if NCPU > 1
+  int hartid = get_hartid();
+  sprint("hartid = %d: User exit with code:%d.\n", hartid, code);
+  g_exit_code = (int)code;
+
+  // Atomically increment finished hart count.
+  asm volatile("amoadd.w zero, %0, (%1)" ::"r"(1), "r"(&g_finished_harts)
+               : "memory");
+
+  // Wait until all harts exit user mode.
+  while (g_finished_harts < NCPU)
+    ;
+
+  // Only hart0 performs final shutdown.
+  if (hartid == 0) {
+    sprint("hartid = 0: shutdown with code:%d.\n", g_exit_code);
+    shutdown(g_exit_code);
+  }
+
+  while (1)
+    ; // unreachable (other harts spin until machine powers off)
+#else
   sprint("User exit with code:%d.\n", code);
   // reclaim the current process, and reschedule. added @lab3_1
   free_process(current);
   schedule();
   return 0;
+#endif
 }
 
 //

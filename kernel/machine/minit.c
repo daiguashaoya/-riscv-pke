@@ -12,9 +12,6 @@
 // stack0 is the privilege mode stack(s) of the proxy kernel on CPU(s)
 // allocates 4KB stack space for each processor (hart)
 //
-// NCPU is defined to be 1 in kernel/config.h, as we consider only one HART in basic
-// labs.
-//
 __attribute__((aligned(16))) char stack0[4096 * NCPU];
 
 // sstart() is the supervisor state entry point defined in kernel/kernel.c
@@ -26,9 +23,18 @@ extern void mtrapvec();
 extern uint64 htif;
 // g_mem_size is defined in spike_interface/spike_memory.c, size of the emulated memory
 extern uint64 g_mem_size;
-// struct riscv_regs is define in kernel/riscv.h, and g_itrframe is used to save
-// registers when interrupt hapens in M mode. added @lab1_2
-riscv_regs g_itrframe;
+// g_itrframe[NCPU]: per-hart interrupt frame for M-mode traps.
+riscv_regs g_itrframe[NCPU];
+
+// Barrier for M-mode init synchronization across harts.
+static volatile int m_init_count = 0;
+
+static inline void m_boot_barrier(volatile int *counter) {
+  __sync_fetch_and_add(counter, 1);
+  while (*counter < NCPU)
+    ;
+  __sync_synchronize();
+}
 
 //
 // get the information of HTIF (calling interface) and the emulated memory by
@@ -91,18 +97,17 @@ void timerinit(uintptr_t hartid) {
 // m_start: machine mode C entry point.
 //
 void m_start(uintptr_t hartid, uintptr_t dtb) {
-  // init the spike file interface (stdin,stdout,stderr)
-  // functions with "spike_" prefix are all defined in codes under spike_interface/,
-  // sprint is also defined in spike_interface/spike_utils.c
-  spike_file_init();
+  // Only hart0 initializes shared HTIF/file/memory interfaces.
+  if (hartid == 0) {
+    spike_file_init();
+    init_dtb(dtb);
+  }
+  m_boot_barrier(&m_init_count);
+
   sprint("In m_start, hartid:%d\n", hartid);
 
-  // init HTIF (Host-Target InterFace) and memory by using the Device Table Blob (DTB)
-  // init_dtb() is defined above.
-  init_dtb(dtb);
-
   // save the address of trap frame for interrupt in M mode to "mscratch". added @lab1_2
-  write_csr(mscratch, &g_itrframe);
+  write_csr(mscratch, &g_itrframe[hartid]);
 
   // set previous privilege mode to S (Supervisor), and will enter S mode after 'mret'
   // write_csr is a macro defined in kernel/riscv.h
@@ -121,11 +126,16 @@ void m_start(uintptr_t hartid, uintptr_t dtb) {
   // delegate_traps() is defined above.
   delegate_traps();
 
-  // also enables interrupt handling in supervisor mode. added @lab1_3
+  // For single-core challenge flow we keep S-mode timer interrupts enabled.
+  // In multicore bootstrap mode (lab1_challenge3 merge), each hart runs one app
+  // directly without scheduler ticks; enabling timer interrupts too early can
+  // trap before current/stvec are initialized on that hart.
+#if NCPU == 1
   write_csr(sie, read_csr(sie) | SIE_SEIE | SIE_STIE | SIE_SSIE);
-
-  // init timing. added @lab1_3
   timerinit(hartid);
+#else
+  write_csr(sie, 0);
+#endif
 
   // switch to supervisor mode (S mode) and jump to s_start(), i.e., set pc to mepc
   asm volatile("mret");

@@ -9,6 +9,7 @@ CROSS_PREFIX 	:= riscv64-unknown-elf-
 CC 				:= $(CROSS_PREFIX)gcc
 AR 				:= $(CROSS_PREFIX)ar
 RANLIB        	:= $(CROSS_PREFIX)ranlib
+NCPU            ?= 1
 
 SRC_DIR        	:= .
 OBJ_DIR 		:= obj
@@ -21,7 +22,7 @@ ifneq (,)
   mabi := -mabi=$(if $(is_32bit),ilp32,lp64)
 endif
 
-CFLAGS        := -Wall -Werror  -fno-builtin -nostdlib -D__NO_INLINE__ -mcmodel=medany -g -gdwarf-2 -Og -std=gnu99 -Wno-unused -Wno-attributes -fno-delete-null-pointer-checks -fno-PIE -fno-omit-frame-pointer $(march)
+CFLAGS        := -Wall -Werror  -fno-builtin -nostdlib -D__NO_INLINE__ -mcmodel=medany -g -gdwarf-2 -Og -std=gnu99 -Wno-unused -Wno-attributes -fno-delete-null-pointer-checks -fno-PIE -fno-omit-frame-pointer -DNCPU=$(NCPU) $(march)
 COMPILE       	:= $(CC) -MMD -MP $(CFLAGS) $(SPROJS_INCLUDE)
 
 #---------------------	utils -----------------------
@@ -84,6 +85,8 @@ SUPPORTED_USER_APPS := \
 	app_touch \
 	app_cat \
 	app_echo \
+	app0 \
+	app1 \
 
 # 	app_shell \
 # 	app_ls \
@@ -152,11 +155,11 @@ all: $(KERNEL_TARGET) $(USER_TARGETS)
 
 run: $(KERNEL_TARGET) $(USER_TARGETS)
 	@echo "********************HUST PKE********************"
-	spike $(KERNEL_TARGET) /bin/app_shell
+	spike -p$(NCPU) $(KERNEL_TARGET) /bin/app_shell
 
 # need openocd!
 gdb:$(KERNEL_TARGET) $(USER_TARGET)
-	spike --rbb-port=9824 -H $(KERNEL_TARGET) $(USER_TARGET) &
+	spike --rbb-port=9824 -H -p$(NCPU) $(KERNEL_TARGET) $(USER_TARGET) &
 	@sleep 1
 	openocd -f ./.spike.cfg &
 	@sleep 1
