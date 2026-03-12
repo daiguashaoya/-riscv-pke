@@ -16,6 +16,7 @@ OBJ_DIR 		:= obj
 SPROJS_INCLUDE 	:= -I.  
 
 HOSTFS_ROOT := hostfs_root
+DIRLIST := dirlist
 ifneq (,)
   march := -march=
   is_32bit := $(findstring 32,$(march))
@@ -152,12 +153,18 @@ $(HOSTFS_ROOT)/bin/%: $(OBJ_DIR) $(UTIL_LIB) $(OBJ_DIR)/user/%.o $(USER_LIB_OBJ)
 
 .DEFAULT_GOAL := $(all)
 
-all: $(KERNEL_TARGET) $(USER_TARGETS)
+all: $(KERNEL_TARGET) $(USER_TARGETS) dirlist
 .PHONY:all
 
-run: $(KERNEL_TARGET) $(USER_TARGETS)
+run: $(KERNEL_TARGET) $(USER_TARGETS) dirlist
 	@echo "********************HUST PKE********************"
 	spike -p$(NCPU) $(KERNEL_TARGET) /bin/app_shell
+
+.PHONY: dirlist
+dirlist: $(USER_TARGETS)
+	@mkdir -p $(HOSTFS_ROOT)
+	@rm -f $(HOSTFS_ROOT)/.dirlist
+	@ls -1A $(HOSTFS_ROOT) | grep -v '^\\.dirlist$$' > $(DIRLIST)
 
 # need openocd!
 gdb:$(KERNEL_TARGET) $(USER_TARGET)
@@ -188,4 +195,4 @@ format:
 	@python ./format.py ./
 
 clean:
-	rm -fr ${OBJ_DIR} ${HOSTFS_ROOT}/bin
+	rm -fr ${OBJ_DIR} ${HOSTFS_ROOT}/bin ${DIRLIST} ${HOSTFS_ROOT}/.dirlist

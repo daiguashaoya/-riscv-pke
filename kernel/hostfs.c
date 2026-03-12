@@ -7,6 +7,7 @@
 #include "spike_interface/spike_file.h"
 #include "spike_interface/spike_utils.h"
 #include "util/string.h"
+#include "util/hash_table.h"
 #include "util/types.h"
 #include "vfs.h"
 
@@ -259,9 +260,110 @@ int hostfs_unlink(struct vinode *parent, struct dentry *sub_dentry, struct vinod
   return -1;
 }
 
-int hostfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset) {
-  panic("hostfs_readdir not implemented!\n");
+static struct dentry *hostfs_find_dentry_by_inode(struct vinode *inode) {
+  if (inode == NULL)
+    return NULL;
+  for (int i = 0; i < HASH_TABLE_SIZE; i++) {
+    struct hash_node *node = dentry_hash_table.head[i].next;
+    while (node) {
+      struct dentry *d = (struct dentry *)node->value;
+      if (d && d->dentry_inode == inode)
+        return d;
+      node = node->next;
+    }
+  }
+  return NULL;
+}
+
+static int hostfs_readdir_from_cache(struct dentry *parent, struct dir *dir,
+                                     int *offset) {
+  int idx = 0;
+  for (int i = 0; i < HASH_TABLE_SIZE; i++) {
+    struct hash_node *node = dentry_hash_table.head[i].next;
+    while (node) {
+      struct dentry *d = (struct dentry *)node->value;
+      if (d && d->parent == parent) {
+        if (idx == *offset) {
+          safestrcpy(dir->name, d->name, MAX_FILE_NAME_LEN);
+          dir->inum = d->dentry_inode ? d->dentry_inode->inum : 0;
+          (*offset)++;
+          return 0;
+        }
+        idx++;
+      }
+      node = node->next;
+    }
+  }
   return -1;
+}
+
+int hostfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset) {
+  struct dentry *parent = NULL;
+  if (dir_vinode->sb && dir_vinode->sb->s_root &&
+      dir_vinode->sb->s_root->dentry_inode == dir_vinode) {
+    parent = dir_vinode->sb->s_root;
+  } else {
+    parent = hostfs_find_dentry_by_inode(dir_vinode);
+  }
+
+  if (parent == NULL)
+    return -1;
+
+  // Root directory uses build-time .dirlist when available.
+  if (parent == dir_vinode->sb->s_root) {
+    spike_file_t *f = (spike_file_t *)dir_vinode->i_fs_info;
+    if (f == NULL) {
+      char path[MAX_PATH_LEN];
+      strcpy(path, "dirlist");
+      f = spike_file_open(path, O_RDONLY, 0);
+      if ((int64)f < 0)
+        return hostfs_readdir_from_cache(parent, dir, offset);
+      dir_vinode->i_fs_info = f;
+    }
+
+    while (1) {
+      // read a line from .dirlist based on byte offset
+      if (spike_file_lseek(f, *offset, LSEEK_SET) < 0)
+        return -1;
+
+      int i = 0;
+      char c;
+      while (spike_file_read(f, &c, 1) == 1) {
+        (*offset)++;
+        if (c == '\n')
+          break;
+        if (c != '\r' && i < MAX_FILE_NAME_LEN - 1)
+          dir->name[i++] = c;
+      }
+      if (i == 0)
+        return -1;
+      dir->name[i] = '\0';
+
+      if (dir->name[0] == '\0')
+        continue;
+      if (strcmp(dir->name, ".dirlist") == 0)
+        continue;
+
+      // Populate inode number via hostfs stat for uniqueness.
+      char fullpath[MAX_PATH_LEN];
+      strcpy(fullpath, H_ROOT_DIR);
+      strcat(fullpath, "/");
+      strcat(fullpath, dir->name);
+      spike_file_t *tmp = spike_file_open(fullpath, O_RDONLY, 0);
+      if ((int64)tmp >= 0) {
+        struct stat st;
+        spike_file_stat(tmp, &st);
+        spike_file_close(tmp);
+        dir->inum = st.st_ino;
+      } else {
+        dir->inum = 0;
+      }
+      return 0;
+    }
+  }
+
+  // Fallback: list cached dentries for non-root hostfs dirs.
+  return hostfs_readdir_from_cache(parent, dir, offset);
 }
 
 struct vinode *hostfs_mkdir(struct vinode *parent, struct dentry *sub_dentry) {
