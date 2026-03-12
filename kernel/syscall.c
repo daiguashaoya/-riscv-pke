@@ -31,7 +31,8 @@ ssize_t sys_user_print(const char *buf, size_t n) {
       (char *)user_va_to_pa((pagetable_t)(current->pagetable), (void *)buf);
   if (pa == NULL)
     return -1;
-  sprint("hartid = %d: %s", hartid, pa);
+  // sprint("hartid = %d: %s", hartid, pa);
+  sprint("%s", pa);
   return 0;
 }
 

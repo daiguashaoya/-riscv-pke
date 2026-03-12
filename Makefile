@@ -81,6 +81,7 @@ SUPPORTED_USER_APPS := \
 	app_relativepath \
 	app_exec \
 	app_shell \
+	app_shellX \
 	app_ls \
 	app_mkdir \
 	app_touch \

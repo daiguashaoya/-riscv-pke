@@ -105,6 +105,16 @@ int do_open(char *pathname, int flags) {
 // return: actual length of data read from the file.
 //
 int do_read(int fd, char *buf, uint64 count) {
+  // fd 0 is stdin from Spike host. It is not tracked in opened_files[].
+  if (fd == 0) {
+    spike_file_t *f = spike_file_get(0);
+    if (!f)
+      return -1;
+    int len = spike_file_read(f, buf, count);
+    spike_file_decref(f);
+    return len;
+  }
+
   struct file *pfile = get_opened_file(fd);
 
   if (pfile->readable == 0) panic("do_read: no readable file!\n");
