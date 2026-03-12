@@ -28,6 +28,7 @@ static volatile int s_stage2_count = 0;
 // Serialize boot-time ELF loading across harts to avoid races on global VFS
 // caches and process-pool allocation (which are lock-free in this lab code).
 static volatile int s_load_turn = 0;
+static volatile int s_load_ready_count = 0;
 
 static inline void boot_barrier(volatile int *counter) {
   __sync_fetch_and_add(counter, 1);
@@ -101,8 +102,11 @@ process *load_user_program(int hartid) {
   process* proc;
 
   proc = alloc_process();
+  // Reserve this proc slot immediately so another hart won't allocate the same
+  // process entry before we switch to user mode.
+  proc->status = READY;
   proc->trapframe->regs.tp = hartid;
-  sprint("User application is loading.\n");
+  sprint("hartid = %d: User application is loading.\n", hartid);
 
   arg_buf arg_bug_msg;
 
@@ -158,8 +162,8 @@ int s_start(void) {
   }
   boot_barrier(&s_stage2_count);
 
-  sprint("hartid = %d: Switch to user mode...\n", hartid);
   if (NCPU == 1) {
+    sprint("hartid = %d: Switch to user mode...\n", hartid);
     insert_to_ready_queue(load_user_program(hartid));
     schedule();
   } else {
@@ -169,6 +173,11 @@ int s_start(void) {
     process *proc = load_user_program(hartid);
     __sync_synchronize();
     s_load_turn++;
+
+    // Keep both harts at the same startup phase so one hart doesn't run too far
+    // ahead and recycle pages before the other hart even starts user code.
+    boot_barrier(&s_load_ready_count);
+    sprint("hartid = %d: Switch to user mode...\n", hartid);
 
     proc->status = RUNNING;
     switch_to(proc);

@@ -15,6 +15,9 @@ extern uint64 g_mem_size;
 static uint64 free_mem_start_addr;  //beginning address of free memory
 static uint64 free_mem_end_addr;    //end address of free memory (not included)
 
+// Per-hart: 0 for kernel alloc stage, 1 for user alloc stage.
+int vm_alloc_stage[NCPU] = {0};
+
 typedef struct node {
   struct node *next;
 } list_node;
@@ -22,18 +25,42 @@ typedef struct node {
 // g_free_mem_list is the head of the list of free physical memory pages
 static list_node g_free_mem_list;
 
+// Spinlock for physical page allocator and refcount updates.
+typedef volatile int spinlock_t;
+static spinlock_t pmm_lock = 0;
+
+static inline void spinlock_acquire(spinlock_t *lock) {
+  int tmp;
+  do {
+    asm volatile("amoswap.w.aq %0, %2, (%1)\n"
+                 : "=r"(tmp)
+                 : "r"(lock), "r"(1)
+                 : "memory");
+  } while (tmp != 0);
+}
+
+static inline void spinlock_release(spinlock_t *lock) {
+  asm volatile("amoswap.w.rl x0, x0, (%0)\n" ::"r"(lock) : "memory");
+}
+
 // 假设物理内存页数不会超过一定上限（这里开辟了512MB/4KB = 131072
 // 个字节数组来记录引用数）
 static uint8 page_ref[131072];
 
 void inc_page_ref(void *pa) {
   uint64 index = ((uint64)pa - free_mem_start_addr) / PGSIZE;
+  spinlock_acquire(&pmm_lock);
   page_ref[index]++;
+  spinlock_release(&pmm_lock);
 }
 
 int get_page_ref(void *pa) {
   uint64 index = ((uint64)pa - free_mem_start_addr) / PGSIZE;
-  return page_ref[index];
+  int ref;
+  spinlock_acquire(&pmm_lock);
+  ref = page_ref[index];
+  spinlock_release(&pmm_lock);
+  return ref;
 }
 
 //
@@ -50,13 +77,23 @@ static void create_freepage_list(uint64 start, uint64 end) {
 // place a physical page at *pa to the free list of g_free_mem_list (to reclaim the page)
 //
 void *alloc_page(void) {
+  spinlock_acquire(&pmm_lock);
+
   list_node *n = g_free_mem_list.next;
+  uint64 hartid = 0;
+  asm volatile("mv %0, tp" : "=r"(hartid));
+
   if (n) {
     g_free_mem_list.next = n->next;
-    // ===== 新增开始 =====
     page_ref[((uint64)n - free_mem_start_addr) / PGSIZE] = 1;
-    // ===== 新增结束 =====
   }
+
+  if (n && vm_alloc_stage[hartid]) {
+    // hartid 打印
+    // sprint("hartid = %ld: alloc page 0x%lx\n", hartid, (uint64)n);
+  }
+
+  spinlock_release(&pmm_lock);
   return (void *)n;
 }
 
@@ -65,18 +102,22 @@ void free_page(void *pa) {
       (uint64)pa >= free_mem_end_addr)
     panic("free_page 0x%lx \n", pa);
 
-  // ===== 新增开始 =====
+  spinlock_acquire(&pmm_lock);
+
   uint64 index = ((uint64)pa - free_mem_start_addr) / PGSIZE;
   if (page_ref[index] > 0)
     page_ref[index]--;
-  if (page_ref[index] > 0)
+  if (page_ref[index] > 0) {
+    spinlock_release(&pmm_lock);
     return; // 还有其它进程正在使用(COW共享)，不能回收
-  // ===== 新增结束 =====
+  }
 
   // insert a physical page to g_free_mem_list
   list_node *n = (list_node *)pa;
   n->next = g_free_mem_list.next;
   g_free_mem_list.next = n;
+
+  spinlock_release(&pmm_lock);
 }
 
 //

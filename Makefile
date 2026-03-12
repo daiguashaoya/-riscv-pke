@@ -87,6 +87,8 @@ SUPPORTED_USER_APPS := \
 	app_echo \
 	app0 \
 	app1 \
+	app_alloc0 \
+	app_alloc1 \
 
 # 	app_shell \
 # 	app_ls \
