@@ -137,7 +137,10 @@ int do_fork(process *parent);
 // exec: replace current process image with a new ELF
 // added @lab4_challenge3
 int do_exec(char *path, char *para);
-// wait: block until child (pid) exits
+// wait:
+//   pid > 0 : block until specific child exits
+//   pid == -1: block until any child exits
+//   pid == 0 : non-blocking poll for any zombie child
 // added @lab4_challenge3
 int do_wait(int pid);
 

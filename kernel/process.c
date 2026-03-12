@@ -415,17 +415,27 @@ int do_exec(char *path, char *para) {
 }
 
 //
-// do_wait: block current process until child (pid) exits.
+// do_wait:
+//   pid > 0 : block until specific child exits
+//   pid == -1: block until any child exits
+//   pid == 0 : non-blocking poll for any zombie child
 // added @lab4_challenge3
 //
 int do_wait(int pid) {
-  if (pid != -1 && pid <= 0)
+  int non_block = 0;
+  if (pid == 0) {
+    non_block = 1;
+    pid = -1; // poll any child
+  } else if (pid != -1 && pid <= 0) {
     return -1;
+  }
 
   while (1) {
     int has_child = 0;
 
     for (int i = 0; i < NPROC; i++) {
+      if (procs[i].status == FREE)
+        continue;
       if (procs[i].parent != current)
         continue;
       if (pid != -1 && (int)procs[i].pid != pid)
@@ -435,6 +445,9 @@ int do_wait(int pid) {
       if (procs[i].status == ZOMBIE) {
         int child_pid = (int)procs[i].pid;
         procs[i].status = FREE;
+        procs[i].parent = NULL;
+        procs[i].queue_next = NULL;
+        procs[i].waiting_for_pid = -1;
         current->waiting_for_pid = -1;
         return child_pid;
       }
@@ -443,6 +456,10 @@ int do_wait(int pid) {
     // waiting target does not exist
     if (!has_child)
       return -1;
+
+    // non-blocking mode: there are children, but none is zombie yet.
+    if (non_block)
+      return 0;
 
     // block until one target child exits
     current->waiting_for_pid = pid; // pid or -1(any child)

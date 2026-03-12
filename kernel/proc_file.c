@@ -64,14 +64,9 @@ void reclaim_proc_file_management(proc_file_management *pfiles) {
 // return: the pointer to the opened file structure.
 //
 struct file *get_opened_file(int fd) {
-  struct file *pfile = NULL;
-
-  // browse opened file list to locate the fd
-  for (int i = 0; i < MAX_FILES; ++i) {
-    pfile = &(current->pfiles->opened_files[i]);  // file entry
-    if (i == fd) break;
-  }
-  if (pfile == NULL) panic("do_read: invalid fd!\n");
+  if (fd < 0 || fd >= MAX_FILES) panic("get_opened_file: invalid fd!\n");
+  struct file *pfile = &(current->pfiles->opened_files[fd]);
+  if (pfile->status == FD_NONE) panic("get_opened_file: unopened fd!\n");
   return pfile;
 }
 
@@ -83,15 +78,17 @@ int do_open(char *pathname, int flags) {
   struct file *opened_file = NULL;
   if ((opened_file = vfs_open(pathname, flags)) == NULL) return -1;
 
-  int fd = 0;
-  if (current->pfiles->nfiles >= MAX_FILES) {
-    panic("do_open: no file entry for current process!\n");
+  // Reserve 0/1/2 for stdin/stdout/stderr.
+  int fd = -1;
+  struct file *pfile = NULL;
+  for (int i = 3; i < MAX_FILES; ++i) {
+    if (current->pfiles->opened_files[i].status == FD_NONE) {
+      fd = i;
+      pfile = &(current->pfiles->opened_files[i]);
+      break;
+    }
   }
-  struct file *pfile;
-  for (fd = 0; fd < MAX_FILES; ++fd) {
-    pfile = &(current->pfiles->opened_files[fd]);
-    if (pfile->status == FD_NONE) break;
-  }
+  if (pfile == NULL) panic("do_open: no file entry for current process!\n");
 
   // initialize this file structure
   memcpy(pfile, opened_file, sizeof(struct file));
@@ -179,14 +176,17 @@ int do_opendir(char *pathname) {
   struct file *opened_file = NULL;
   if ((opened_file = vfs_opendir(pathname)) == NULL) return -1;
 
-  int fd = 0;
-  struct file *pfile;
-  for (fd = 0; fd < MAX_FILES; ++fd) {
-    pfile = &(current->pfiles->opened_files[fd]);
-    if (pfile->status == FD_NONE) break;
+  // Reserve 0/1/2 for stdin/stdout/stderr.
+  int fd = -1;
+  struct file *pfile = NULL;
+  for (int i = 3; i < MAX_FILES; ++i) {
+    if (current->pfiles->opened_files[i].status == FD_NONE) {
+      fd = i;
+      pfile = &(current->pfiles->opened_files[i]);
+      break;
+    }
   }
-  if (pfile->status != FD_NONE)  // no free entry
-    panic("do_opendir: no file entry for current process!\n");
+  if (pfile == NULL) panic("do_opendir: no file entry for current process!\n");
 
   // initialize this file structure
   memcpy(pfile, opened_file, sizeof(struct file));
