@@ -299,6 +299,7 @@ static int hostfs_readdir_from_cache(struct dentry *parent, struct dir *dir,
 
 int hostfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset) {
   struct dentry *parent = NULL;
+  // 特判是不是根目录，如果是根目录直接从.dirlist文件中读取目录项
   if (dir_vinode->sb && dir_vinode->sb->s_root &&
       dir_vinode->sb->s_root->dentry_inode == dir_vinode) {
     parent = dir_vinode->sb->s_root;
@@ -310,6 +311,7 @@ int hostfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset) {
     return -1;
 
   // Root directory uses build-time .dirlist when available.
+  // 这里也只是确定是不是hostfs的根目录
   if (parent == dir_vinode->sb->s_root) {
     spike_file_t *f = (spike_file_t *)dir_vinode->i_fs_info;
     if (f == NULL) {
@@ -328,6 +330,7 @@ int hostfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset) {
 
       int i = 0;
       char c;
+      // 逐字符读取文件名
       while (spike_file_read(f, &c, 1) == 1) {
         (*offset)++;
         if (c == '\n')
@@ -341,8 +344,6 @@ int hostfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset) {
 
       if (dir->name[0] == '\0')
         continue;
-      if (strcmp(dir->name, ".dirlist") == 0)
-        continue;
 
       // Populate inode number via hostfs stat for uniqueness.
       char fullpath[MAX_PATH_LEN];
@@ -354,6 +355,7 @@ int hostfs_readdir(struct vinode *dir_vinode, struct dir *dir, int *offset) {
         struct stat st;
         spike_file_stat(tmp, &st);
         spike_file_close(tmp);
+        // 获取文件的inode号，确保目录项的唯一性
         dir->inum = st.st_ino;
       } else {
         dir->inum = 0;
