@@ -372,6 +372,7 @@ int do_exec(char *path, char *para) {
   uint64 sp = USER_STACK_TOP; // will be decremented before first use
 
   // Place the para string (grows downward)
+  // 将 para 字符串放在用户栈上（向下增长）
   int para_len = strlen(para) + 1; // including null terminator
   sp -= para_len;
   sp = ROUNDDOWN(sp, 8); // 8-byte align the string start
@@ -395,6 +396,7 @@ int do_exec(char *path, char *para) {
   sp = ROUNDDOWN(sp, 16);
 
   // Step 6: now that path and para have been fully consumed, clean up old heap
+  // 这时才真正清理旧堆，因为之前的步骤中 path 和 para 可能还在使用旧堆的物理页
   for (uint64 hb = current->user_heap.heap_bottom;
        hb < current->user_heap.heap_top; hb += PGSIZE) {
     user_vm_unmap(current->pagetable, hb, PGSIZE, 1);
@@ -423,6 +425,9 @@ int do_exec(char *path, char *para) {
 //
 int do_wait(int pid) {
   int non_block = 0;
+  // wait(0)就是非阻塞等待，有子进程但没有僵尸子进程时返回0；
+  // wait(-1)是阻塞等待，直到任一子进程退出；
+  // wait(pid>0)是阻塞等待，直到特定pid的子进程退出。
   if (pid == 0) {
     non_block = 1;
     pid = -1; // poll any child
@@ -438,6 +443,7 @@ int do_wait(int pid) {
         continue;
       if (procs[i].parent != current)
         continue;
+      // 查询是否为特定pid的子进程（pid > 0）或者任一子进程（pid == -1）
       if (pid != -1 && (int)procs[i].pid != pid)
         continue;
 
