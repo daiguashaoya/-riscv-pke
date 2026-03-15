@@ -348,6 +348,19 @@ int do_exec(char *path, char *para) {
   safestrcpy(path_copy, path, sizeof(path_copy));
   safestrcpy(para_copy, para, sizeof(para_copy));
 
+  // Verify the target exists and looks like an ELF before destroying the
+  // current image. This keeps failed exec() calls recoverable to user space.
+  struct file *probe = vfs_open(path_copy, O_RDONLY);
+  if (probe == NULL)
+    return -1;
+
+  elf_header ehdr;
+  vfs_lseek(probe, 0, LSEEK_SET);
+  int read_len = (int)vfs_read(probe, (char *)&ehdr, sizeof(ehdr));
+  vfs_close(probe);
+  if (read_len != sizeof(ehdr) || ehdr.magic != ELF_MAGIC)
+    return -1;
+
   // Step 1: unmap old CODE and DATA segments
   for (int i = 0; i < current->total_mapped_region; i++) {
     if (current->mapped_info[i].seg_type == CODE_SEGMENT) {

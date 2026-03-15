@@ -161,7 +161,6 @@ struct file *vfs_open(const char *path, int flags) {
       hash_put_dentry(file_dentry);
       hash_put_vinode(new_inode); 
     } else {
-      sprint("vfs_open: cannot find the file!\n");
       return NULL;
     }
   }

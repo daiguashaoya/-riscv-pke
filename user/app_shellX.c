@@ -78,7 +78,7 @@ static int exec_command_with_fallback(char *command, char *para, char *real_cmd)
 static void exec_or_exit(char *command, char *para, char *real_cmd) {
   int ret = exec_command_with_fallback(command, para, real_cmd);
   if (ret == -1)
-    printu("exec %s failed!\n", real_cmd);
+    printu("shellX: command not found or not executable: %s\n", command);
   exit(-1);
 }
 
@@ -183,14 +183,6 @@ static int run_one_segment(char *segment, int background, char *command,
 
   if (strcmp(command, "exit") == 0)
     return 1;
-
-  // For display only; child process will still try exec fallbacks.
-  if (command[0] == '/') {
-    strcpy(real_cmd, command);
-  } else {
-    strcpy(real_cmd, "/bin/app_");
-    strcat(real_cmd, command);
-  }
 
   /*
    * Automatic command path completion:
