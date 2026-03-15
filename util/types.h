@@ -39,6 +39,7 @@ typedef unsigned long size_t;
 
 #define FD_NONE 0
 #define FD_OPENED 1
+#define FD_OPENED_PIPE 2
 
 #define MAX_FILE_NAME_LEN 32
 

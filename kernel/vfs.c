@@ -635,6 +635,7 @@ struct file *alloc_vfs_file(struct dentry *file_dentry, int readable, int writab
   file->writable = writable;
   file->offset = 0;
   file->status = FD_OPENED;
+  file->pipe = NULL;
   return file;
 }
 

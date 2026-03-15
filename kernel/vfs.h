@@ -85,6 +85,7 @@ struct file {
   int writable;
   int offset;
   struct dentry *f_dentry;
+  void *pipe;
 };
 
 // file constructor and destructor(use free_page to destruct)

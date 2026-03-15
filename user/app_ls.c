@@ -5,7 +5,7 @@
 int main(int argc, char *argv[]) {
   char *path = "/RAMDISK0";
 
-  if (argc >= 1 && argv && argv[0]) {
+  if (argc >= 1 && argv && argv[0] && argv[0][0] != '\0') {
     // 一参 exec("/bin/app_ls") 时，argv[0] 是程序名本身
     if (strcmp(argv[0], "/bin/app_ls") != 0 &&
         strcmp(argv[0], "bin/app_ls") != 0) {

@@ -16,8 +16,11 @@ int main(int argc, char *argv[]) {
   char delim[3] = " \n";
   fd = open("/shellrc", O_RDONLY);
 
-  read_u(fd, buf, MAXBUF);
+  int n = read_u(fd, buf, MAXBUF - 1);
   close(fd);
+  if (n < 0)
+    exit(-1);
+  buf[n] = '\0';
   char *command = naive_malloc();
   char *para = naive_malloc();
   int start = 0;

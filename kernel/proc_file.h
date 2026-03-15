@@ -15,6 +15,8 @@ int do_lseek(int fd, int offset, int whence);
 int do_stat(int fd, struct istat *istat);
 int do_disk_stat(int fd, struct istat *istat);
 int do_close(int fd);
+int do_pipe(int fd[2]);
+int do_dup2(int oldfd, int newfd);
 
 int do_opendir(char *pathname);
 int do_readdir(int fd, struct dir *dir);
@@ -40,5 +42,8 @@ typedef struct proc_file_management_t {
 proc_file_management *init_proc_file_management(void);
 
 void reclaim_proc_file_management(proc_file_management *pfiles);
+void close_all_files(proc_file_management *pfiles);
+void dup_proc_file_management(proc_file_management *dst,
+                              proc_file_management *src);
 
 #endif

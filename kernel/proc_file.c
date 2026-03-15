@@ -7,6 +7,7 @@
 #include "hostfs.h"
 #include "pmm.h"
 #include "process.h"
+#include "sched.h"
 #include "ramdev.h"
 #include "rfs.h"
 #include "riscv.h"
@@ -14,6 +15,185 @@
 #include "spike_interface/spike_utils.h"
 #include "util/functions.h"
 #include "util/string.h"
+
+#define PIPE_SIZE 4096
+
+typedef struct pipe_t {
+  // data ring buffer (allocated separately for simplicity).
+  char *buf;
+  uint32 rpos;
+  uint32 wpos;
+  uint32 len;  // bytes currently in buffer
+
+  // number of opened endpoints
+  int readers;
+  int writers;
+
+  // wait queues for blocking read/write
+  process *read_wait_queue;
+  process *write_wait_queue;
+} pipe_t;
+
+static void pipe_wake_readers(pipe_t *p) {
+  if (!p)
+    return;
+  process *proc = pop_from_wait_queue(&p->read_wait_queue);
+  if (proc)
+    insert_to_ready_queue(proc);
+}
+
+static void pipe_wake_writers(pipe_t *p) {
+  if (!p)
+    return;
+  process *proc = pop_from_wait_queue(&p->write_wait_queue);
+  if (proc)
+    insert_to_ready_queue(proc);
+}
+
+static void pipe_wake_all_readers(pipe_t *p) {
+  if (!p)
+    return;
+  process *proc = pop_from_wait_queue(&p->read_wait_queue);
+  while (proc) {
+    insert_to_ready_queue(proc);
+    proc = pop_from_wait_queue(&p->read_wait_queue);
+  }
+}
+
+static void pipe_wake_all_writers(pipe_t *p) {
+  if (!p)
+    return;
+  process *proc = pop_from_wait_queue(&p->write_wait_queue);
+  while (proc) {
+    insert_to_ready_queue(proc);
+    proc = pop_from_wait_queue(&p->write_wait_queue);
+  }
+}
+
+// 为管道分配内存并初始化
+static pipe_t *alloc_pipe(void) {
+  pipe_t *p = (pipe_t *)alloc_page();
+  if (!p)
+    return NULL;
+  memset(p, 0, sizeof(*p));
+
+  p->buf = (char *)alloc_page();
+  if (!p->buf) {
+    free_page(p);
+    return NULL;
+  }
+
+  p->rpos = 0;
+  p->wpos = 0;
+  p->len = 0;
+  p->readers = 1;
+  p->writers = 1;
+  p->read_wait_queue = NULL;
+  p->write_wait_queue = NULL;
+  return p;
+}
+
+static int pipe_read(pipe_t *p, char *dst, uint64 count) {
+  if (!p || !dst)
+    return -1;
+
+  while (p->len == 0) {
+    // No buffered data. If there are no writers, report EOF.
+    if (p->writers == 0)
+      return 0;
+
+    // Otherwise block until data becomes available or writers close.
+    current->status = BLOCKED;
+    insert_to_wait_queue(&p->read_wait_queue, current);
+    schedule();
+  }
+
+  uint32 n = (uint32)count;
+  if (n > p->len)
+    n = p->len;
+
+  uint32 first = n;
+  uint32 till_end = PIPE_SIZE - p->rpos;
+  if (first > till_end)
+    first = till_end;
+  memcpy(dst, p->buf + p->rpos, first);
+
+  if (n > first)
+    memcpy(dst + first, p->buf, n - first);
+
+  p->rpos = (p->rpos + n) % PIPE_SIZE;
+  p->len -= n;
+
+  // If writers were blocked due to full buffer, reading makes room.
+  pipe_wake_writers(p);
+  return (int)n;
+}
+
+static int pipe_write(pipe_t *p, const char *src, uint64 count) {
+  if (!p || !src)
+    return -1;
+
+  uint64 written = 0;
+  while (written < count) {
+    // If no readers, pretend the write succeeds (avoid deadlock loops).
+    if (p->readers == 0)
+      return (int)count;
+
+    while (p->len == PIPE_SIZE) {
+      if (p->readers == 0)
+        return (int)count;
+
+      current->status = BLOCKED;
+      insert_to_wait_queue(&p->write_wait_queue, current);
+      schedule();
+    }
+
+    uint32 space = PIPE_SIZE - p->len;
+    uint32 want = (uint32)(count - written);
+    if (want > space)
+      want = space;
+
+    uint32 first = want;
+    uint32 till_end = PIPE_SIZE - p->wpos;
+    if (first > till_end)
+      first = till_end;
+    memcpy(p->buf + p->wpos, src + written, first);
+    if (want > first)
+      memcpy(p->buf, src + written + first, want - first);
+
+    p->wpos = (p->wpos + want) % PIPE_SIZE;
+    p->len += want;
+    written += want;
+
+    // New data is available; wake one reader.
+    pipe_wake_readers(p);
+  }
+
+  return (int)written;
+}
+
+static void pipe_close_end(pipe_t *p, int readable, int writable) {
+  if (!p)
+    return;
+
+  if (readable && p->readers > 0)
+    p->readers--;
+  if (writable && p->writers > 0)
+    p->writers--;
+
+  // Closing endpoints may unblock the other side.
+  if (p->writers == 0)
+    pipe_wake_all_readers(p);
+  if (p->readers == 0)
+    pipe_wake_all_writers(p);
+
+  if (p->readers == 0 && p->writers == 0) {
+    // Nobody holds the pipe anymore.
+    if (p->buf)
+      free_page(p->buf);
+    free_page(p);
+  }
+}
 
 //
 // initialize file system
@@ -59,6 +239,77 @@ void reclaim_proc_file_management(proc_file_management *pfiles) {
   return;
 }
 
+// 辅助函数：在 dup 过程中增加引用计数，避免被过早释放
+static void bump_ref_on_dup(struct file *pfile) {
+  if (!pfile)
+    return;
+
+  if (pfile->status == FD_OPENED_PIPE) {
+    pipe_t *p = (pipe_t *)pfile->pipe;
+    if (p) {
+      if (pfile->readable)
+        p->readers++;
+      if (pfile->writable)
+        p->writers++;
+    }
+    return;
+  }
+
+  if (pfile->status == FD_OPENED) {
+    // Each proc table entry counts as one opened reference at vfs layer.
+    if (pfile->f_dentry)
+      pfile->f_dentry->d_ref++;
+    return;
+  }
+}
+
+static void drop_ref_on_close(struct file *pfile) {
+  if (!pfile)
+    return;
+
+  if (pfile->status == FD_OPENED_PIPE) {
+    pipe_close_end((pipe_t *)pfile->pipe, pfile->readable, pfile->writable);
+    pfile->status = FD_NONE;
+    pfile->readable = 0;
+    pfile->writable = 0;
+    pfile->offset = 0;
+    pfile->f_dentry = NULL;
+    pfile->pipe = NULL;
+    return;
+  }
+
+  if (pfile->status == FD_OPENED) {
+    (void)vfs_close(pfile);
+    pfile->pipe = NULL;
+    return;
+  }
+}
+
+void close_all_files(proc_file_management *pfiles) {
+  if (!pfiles)
+    return;
+  for (int fd = 0; fd < MAX_FILES; fd++) {
+    if (pfiles->opened_files[fd].status != FD_NONE)
+      drop_ref_on_close(&pfiles->opened_files[fd]);
+  }
+  pfiles->nfiles = 0;
+}
+
+void dup_proc_file_management(proc_file_management *dst,
+                              proc_file_management *src) {
+  if (!dst || !src)
+    return;
+
+  dst->cwd = src->cwd;
+  dst->nfiles = src->nfiles;
+
+  for (int fd = 0; fd < MAX_FILES; fd++) {
+    dst->opened_files[fd] = src->opened_files[fd];
+    if (dst->opened_files[fd].status != FD_NONE)
+      bump_ref_on_dup(&dst->opened_files[fd]);
+  }
+}
+
 //
 // get an opened file from proc->opened_file array.
 // return: the pointer to the opened file structure.
@@ -102,8 +353,25 @@ int do_open(char *pathname, int flags) {
 // return: actual length of data read from the file.
 //
 int do_read(int fd, char *buf, uint64 count) {
-  // fd 0 is stdin from Spike host. It is not tracked in opened_files[].
+  if (count == 0)
+    return 0;
+
+  // fd 0 defaults to stdin from Spike host, but can be redirected (e.g., to a pipe).
   if (fd == 0) {
+    struct file *in = &(current->pfiles->opened_files[0]);
+    if (in->status == FD_OPENED_PIPE) {
+      if (in->readable == 0)
+        panic("do_read: pipe not readable!\n");
+      return pipe_read((pipe_t *)in->pipe, buf, count);
+    }
+    if (in->status == FD_OPENED) {
+      // redirected stdin to a regular file
+      struct file *pfile = get_opened_file(0);
+      if (pfile->readable == 0)
+        panic("do_read: no readable file!\n");
+      return (int)vfs_read(pfile, buf, count);
+    }
+
     spike_file_t *f = spike_file_get(0);
     if (!f)
       return -1;
@@ -116,11 +384,10 @@ int do_read(int fd, char *buf, uint64 count) {
 
   if (pfile->readable == 0) panic("do_read: no readable file!\n");
 
-  char buffer[count + 1];
-  int len = vfs_read(pfile, buffer, count);
-  buffer[count] = '\0';
-  strcpy(buf, buffer);
-  return len;
+  if (pfile->status == FD_OPENED_PIPE)
+    return pipe_read((pipe_t *)pfile->pipe, buf, count);
+
+  return (int)vfs_read(pfile, buf, count);
 }
 
 //
@@ -132,8 +399,11 @@ int do_write(int fd, char *buf, uint64 count) {
 
   if (pfile->writable == 0) panic("do_write: cannot write file!\n");
 
-  int len = vfs_write(pfile, buf, count);
-  return len;
+  if (pfile->status == FD_OPENED_PIPE) {
+    return pipe_write((pipe_t *)pfile->pipe, buf, count);
+  }
+
+  return (int)vfs_write(pfile, buf, count);
 }
 
 //
@@ -165,7 +435,88 @@ int do_disk_stat(int fd, struct istat *istat) {
 //
 int do_close(int fd) {
   struct file *pfile = get_opened_file(fd);
-  return vfs_close(pfile);
+  if (pfile->status == FD_OPENED_PIPE) {
+    drop_ref_on_close(pfile);
+    if (current->pfiles->nfiles > 0)
+      current->pfiles->nfiles--;
+    return 0;
+  }
+  int ret = vfs_close(pfile);
+  if (current->pfiles->nfiles > 0)
+    current->pfiles->nfiles--;
+  return ret;
+}
+
+// 创建一个管道，fd[0] 用于读，fd[1] 用于写
+int do_pipe(int fd[2]) {
+  if (!fd)
+    return -1;
+
+  int rfd = -1;
+  int wfd = -1;
+
+  // Reserve 0/1/2 for stdio.
+  for (int i = 3; i < MAX_FILES; i++) {
+    if (current->pfiles->opened_files[i].status != FD_NONE)
+      continue;
+    if (rfd < 0)
+      rfd = i;
+    else {
+      wfd = i;
+      break;
+    }
+  }
+
+  if (rfd < 0 || wfd < 0)
+    return -1;
+
+  pipe_t *p = alloc_pipe();
+  if (!p)
+    return -1;
+
+  struct file *rf = &current->pfiles->opened_files[rfd];
+  memset(rf, 0, sizeof(*rf));
+  rf->status = FD_OPENED_PIPE;
+  rf->readable = 1;
+  rf->writable = 0;
+  rf->offset = 0;
+  rf->f_dentry = NULL;
+  rf->pipe = (void *)p;
+
+  struct file *wf = &current->pfiles->opened_files[wfd];
+  memset(wf, 0, sizeof(*wf));
+  wf->status = FD_OPENED_PIPE;
+  wf->readable = 0;
+  wf->writable = 1;
+  wf->offset = 0;
+  wf->f_dentry = NULL;
+  wf->pipe = (void *)p;
+
+  fd[0] = rfd;
+  fd[1] = wfd;
+  current->pfiles->nfiles += 2;
+  return 0;
+}
+
+// 重复 oldfd 到 newfd，若 newfd 已经被打开，则先关闭它
+int do_dup2(int oldfd, int newfd) {
+  if (oldfd < 0 || oldfd >= MAX_FILES || newfd < 0 || newfd >= MAX_FILES)
+    return -1;
+  if (oldfd == newfd)
+    return newfd;
+
+  struct file *old = &(current->pfiles->opened_files[oldfd]);
+  if (old->status == FD_NONE)
+    return -1;
+
+  if (current->pfiles->opened_files[newfd].status != FD_NONE)
+    do_close(newfd);
+
+  struct file *dst = &(current->pfiles->opened_files[newfd]);
+  *dst = *old;
+  bump_ref_on_dup(dst);
+  current->pfiles->nfiles += 1;
+  return newfd;
 }
 
 //

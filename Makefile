@@ -86,6 +86,7 @@ SUPPORTED_USER_APPS := \
 	app_mkdir \
 	app_touch \
 	app_cat \
+	app_grep \
 	app_echo \
 	app0 \
 	app1 \

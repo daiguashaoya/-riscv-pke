@@ -48,8 +48,130 @@ static void reap_background_children(void) {
   }
 }
 
+static void reap_foreground_children(int pid1, int pid2) {
+  int pid = wait(0); // non-blocking poll
+  while (pid > 0) {
+    if (pid != pid1 && pid != pid2)
+      printu("[bg] pid %d finished.\n", pid);
+    pid = wait(0);
+  }
+}
+
+// 执行命令
+static int exec_command_with_fallback(char *command, char *para, char *real_cmd) {
+  if (command[0] == '/') {
+    strcpy(real_cmd, command);
+  } else {
+    strcpy(real_cmd, "/bin/app_");
+    strcat(real_cmd, command);
+  }
+
+  int ret = exec(real_cmd, para);
+  if (ret == -1 && command[0] != '/') {
+    strcpy(real_cmd, "/bin/");
+    strcat(real_cmd, command);
+    ret = exec(real_cmd, para);
+  }
+  return ret;
+}
+
+static void exec_or_exit(char *command, char *para, char *real_cmd) {
+  int ret = exec_command_with_fallback(command, para, real_cmd);
+  if (ret == -1)
+    printu("exec %s failed!\n", real_cmd);
+  exit(-1);
+}
+
+static int run_pipeline_segment(char *segment, int background) {
+  char *pipe_pos = strchr(segment, '|');
+  if (pipe_pos == 0)
+    return 0;
+  if (strchr(pipe_pos + 1, '|') != 0) {
+    printu("shellX: only one pipe is supported now\n");
+    return 0;
+  }
+
+  *pipe_pos = '\0';
+  char *left = segment;
+  char *right = pipe_pos + 1;
+  trim_trailing_ws(left);
+  trim_trailing_ws(right);
+  while (*left == ' ' || *left == '\t')
+    left++;
+  while (*right == ' ' || *right == '\t')
+    right++;
+
+  if (*left == '\0' || *right == '\0') {
+    printu("shellX: invalid pipe format, use cmd1 | cmd2\n");
+    return 0;
+  }
+
+  // 解析 | 左右两边的指令和参数
+  char left_cmd[128], left_para[128], left_real_cmd[128];
+  char right_cmd[128], right_para[128], right_real_cmd[128];
+  int parse_left = parse_one_command(left, left_cmd, left_para);
+  int parse_right = parse_one_command(right, right_cmd, right_para);
+  if (parse_left <= 0 || parse_right <= 0) {
+    printu("shellX: invalid pipe format, use cmd [arg] | cmd [arg]\n");
+    return 0;
+  }
+
+  int fd[2];
+  if (pipe(fd) < 0) {
+    printu("shellX: pipe creation failed\n");
+    return 0;
+  }
+
+  int pid1 = fork();
+  if (pid1 == 0) {
+    // 重定向,stdout -> pipe write end
+    dup2(fd[1], 1);
+    close(fd[0]);
+    close(fd[1]);
+    exec_or_exit(left_cmd, left_para, left_real_cmd);
+  }
+  if (pid1 < 0) {
+    close(fd[0]);
+    close(fd[1]);
+    printu("shellX: fork failed for left command\n");
+    return 0;
+  }
+
+  int pid2 = fork();
+  if (pid2 == 0) {
+    dup2(fd[0], 0);
+    close(fd[1]);
+    close(fd[0]);
+    exec_or_exit(right_cmd, right_para, right_real_cmd);
+  }
+
+  close(fd[0]);
+  close(fd[1]);
+
+  if (pid2 < 0) {
+    printu("shellX: fork failed for right command\n");
+    wait(pid1);
+    return 0;
+  }
+
+  if (background) {
+    printu("[bg] pipeline started: %d | %d\n", pid1, pid2);
+  } else {
+    printu("\n========== Command Start ==========\n\n");
+    wait(pid1);
+    wait(pid2);
+    reap_foreground_children(pid1, pid2);
+    printu("\n========== Command End ==========\n\n");
+  }
+
+  return 0;
+}
+
 static int run_one_segment(char *segment, int background, char *command,
                            char *para, char *real_cmd) {
+  if (strchr(segment, '|') != 0)
+    return run_pipeline_segment(segment, background);
+
   // 解析指令和参数
   int parse_ret = parse_one_command(segment, command, para);
   if (parse_ret < 0) {
@@ -62,32 +184,30 @@ static int run_one_segment(char *segment, int background, char *command,
   if (strcmp(command, "exit") == 0)
     return 1;
 
+  // For display only; child process will still try exec fallbacks.
+  if (command[0] == '/') {
+    strcpy(real_cmd, command);
+  } else {
+    strcpy(real_cmd, "/bin/app_");
+    strcat(real_cmd, command);
+  }
+
   /*
    * Automatic command path completion:
    *   ls   -> /bin/app_ls
    * Fallback:
    *   app0 -> /bin/app0
    */
-  strcpy(real_cmd, "/bin/app_");
-  strcat(real_cmd, command);
-
   int pid = fork();
   if (pid == 0) {
-    int ret = exec(real_cmd, para);
-    if (ret == -1 && command[0] != '/') {
-      strcpy(real_cmd, "/bin/");
-      strcat(real_cmd, command);
-      ret = exec(real_cmd, para);
-    }
-    if (ret == -1)
-      printu("exec %s failed!\n", real_cmd);
-    exit(-1);
+    exec_or_exit(command, para, real_cmd);
   } else if (pid > 0) {
     if (background) {
       printu("[bg] pid %d started: %s\n", pid, real_cmd);
     } else {
       printu("\n========== Command Start ==========\n\n");
       wait(pid);
+      reap_foreground_children(pid, -1);
       printu("\n========== Command End ==========\n\n");
     }
   } else {

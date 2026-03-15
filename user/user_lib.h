@@ -47,6 +47,10 @@ void printpa(int* va);
 int read_cwd(char *path);
 int change_cwd(const char *path);
 
+// pipe and fd duplication
+int pipe(int fd[2]);
+int dup2(int oldfd, int newfd);
+
 // added @ lab4_challenge3
 // Two-arg exec implementation.
 int exec_with_para(const char *path, const char *para);

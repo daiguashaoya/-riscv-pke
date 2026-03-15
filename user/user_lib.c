@@ -176,6 +176,14 @@ int unlink_u(const char *fn) {
 //
 int close(int fd) { return do_user_call(SYS_user_close, fd, 0, 0, 0, 0, 0, 0); }
 
+int pipe(int fd[2]) {
+  return do_user_call(SYS_user_pipe, (uint64)fd, 0, 0, 0, 0, 0, 0);
+}
+
+int dup2(int oldfd, int newfd) {
+  return do_user_call(SYS_user_dup2, oldfd, newfd, 0, 0, 0, 0, 0);
+}
+
 // lab1_challenge1
 int print_backtrace(int depth) {
   return do_user_call(SYS_user_print_backtrace, depth, 0, 0, 0, 0, 0, 0);

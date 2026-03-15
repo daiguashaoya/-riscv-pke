@@ -3,20 +3,45 @@
 #include "util/types.h"
 
 int main(int argc, char *argv[]) {
-  int fd;
   int MAXBUF = 512;
-  char buf[MAXBUF];
-  char *filename = argv[0];
+  char buf[MAXBUF + 1];
+  int fd = 0;
 
-  printu("\n======== cat command ========\n");
-  printu("cat: %s\n", filename);
+  printu("---------- cat command -----------\n");
 
-  fd = open(filename, O_RDWR);
-  printu("file descriptor fd: %d\n", fd);
+  if (argc >= 1 && argv && argv[0] && argv[0][0] != '\0') {
+    printu("cat: %s\n", argv[0]);
+    fd = open(argv[0], O_RDONLY);
+    if (fd < 0) {
+      printu("cat: open %s failed\n", argv[0]);
+      exit(-1);
+      return -1;
+    }
+  } else {
+    printu("cat: <stdin>\n");
+  }
 
-  read_u(fd, buf, MAXBUF);
-  printu("read content: \n%s\n", buf);
-  close(fd);
+  while (1) {
+    int n = read_u(fd, buf, MAXBUF);
+    if (n <= 0)
+      break;
+    buf[n] = '\0';
+    // printu() has a fixed internal buffer (256 bytes), so print in chunks.
+    int off = 0;
+    while (off < n) {
+      int chunk = n - off;
+      if (chunk > 200)
+        chunk = 200;
+      char saved = buf[off + chunk];
+      buf[off + chunk] = '\0';
+      printu("%s", buf + off);
+      buf[off + chunk] = saved;
+      off += chunk;
+    }
+  }
+
+  if (fd != 0)
+    close(fd);
 
   exit(0);
   return 0;

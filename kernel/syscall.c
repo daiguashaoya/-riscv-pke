@@ -26,14 +26,17 @@ ssize_t sys_user_print(const char *buf, size_t n) {
   // buf is now an address in user space of the given app's user stack,
   // so we have to transfer it into phisical address (kernel is running in
   // direct mapping).
-  int hartid = get_hartid();
   char *pa =
       (char *)user_va_to_pa((pagetable_t)(current->pagetable), (void *)buf);
   if (pa == NULL)
     return -1;
-  // sprint("hartid = %d: %s", hartid, pa);
+
+  // stdout may have been redirected via dup2(), especially for pipes.
+  if (current->pfiles && current->pfiles->opened_files[1].status != FD_NONE)
+    return do_write(1, pa, n);
+
   sprint("%s", pa);
-  return 0;
+  return (ssize_t)n;
 }
 
 #if NCPU > 1
@@ -378,6 +381,16 @@ ssize_t sys_user_disk_stat(int fd, struct istat *istat) {
 //
 ssize_t sys_user_close(int fd) { return do_close(fd); }
 
+ssize_t sys_user_pipe(int *fdva) {
+  int *fdpa =
+      (int *)user_va_to_pa((pagetable_t)(current->pagetable), (void *)fdva);
+  if (fdpa == NULL)
+    return -1;
+  return do_pipe(fdpa);
+}
+
+ssize_t sys_user_dup2(int oldfd, int newfd) { return do_dup2(oldfd, newfd); }
+
 //
 // lib call to opendir
 //
@@ -553,6 +566,10 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6,
     return sys_user_disk_stat(a1, (struct istat *)a2);
   case SYS_user_close:
     return sys_user_close(a1);
+  case SYS_user_pipe:
+    return sys_user_pipe((int *)a1);
+  case SYS_user_dup2:
+    return sys_user_dup2(a1, a2);
   // added @lab4_2
   case SYS_user_opendir:
     return sys_user_opendir((char *)a1);

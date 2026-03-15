@@ -16,7 +16,7 @@ void cd(const char *path) {
 int main(int argc, char *argv[]) {
   int fd;
   int MAXBUF = 512;
-  char buf[MAXBUF];
+  char buf[MAXBUF + 1];
   char str[] = "hello world";
   int fd1, fd2;
 
@@ -40,7 +40,10 @@ int main(int argc, char *argv[]) {
   fd = open("./ramfile", O_RDWR);
   printu("read: ./ramfile\n");
 
-  read_u(fd, buf, MAXBUF);
+  int n = read_u(fd, buf, MAXBUF);
+  if (n < 0)
+    n = 0;
+  buf[n] = '\0';
   printu("read content: \n%s\n", buf);
   close(fd);
 
@@ -56,7 +59,10 @@ int main(int argc, char *argv[]) {
   fd = open("./hostfile.txt", O_RDONLY);
   printu("file descriptor fd: %d\n", fd);
 
-  read_u(fd, buf, MAXBUF);
+  n = read_u(fd, buf, MAXBUF);
+  if (n < 0)
+    n = 0;
+  buf[n] = '\0';
   printu("read content: \n%s\n", buf);
 
   close(fd);

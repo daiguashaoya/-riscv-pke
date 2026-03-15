@@ -184,6 +184,9 @@ process *alloc_process() {
 // reclaim a process. added @lab3_1
 //
 int free_process(process *proc) {
+  // Release any inherited pipe/file endpoints before the process becomes zombie.
+  close_all_files(proc->pfiles);
+
   // we set the status to ZOMBIE, but cannot destruct its vm space immediately.
   // since proc can be current process, and its user kernel stack is currently
   // in use! but for proxy kernel, it (memory leaking) may NOT be a really
@@ -213,6 +216,9 @@ int free_process(process *proc) {
 int do_fork(process *parent) {
   sprint("will fork a child from parent %d.\n", parent->pid);
   process *child = alloc_process();
+  // Inherit parent's opened files (including pipes) so child can `dup2()` and
+  // `exec()` with redirected stdio.
+  dup_proc_file_management(child->pfiles, parent->pfiles);
 
   for (int i = 0; i < parent->total_mapped_region; i++) {
     // browse parent's vm space, and copy its trapframe and data segments,
@@ -280,14 +286,17 @@ int do_fork(process *parent) {
         break;
       }
     case CODE_SEGMENT: {
-      // map child code to parent's physical code pages (shared, not copied)
-      uint64 code_pa = lookup_pa(parent->pagetable, parent->mapped_info[i].va);
-      map_pages(child->pagetable, parent->mapped_info[i].va,
-                parent->mapped_info[i].npages * PGSIZE, code_pa,
-                prot_to_type(PROT_EXEC | PROT_READ, 1));
-      sprint(
-          "do_fork map code segment at pa:%lx of parent to child at va:%lx.\n",
-          code_pa, parent->mapped_info[i].va);
+      // map child code to parent's physical code pages (shared, not copied).
+      // Note: pages of a segment are not guaranteed to be physically contiguous,
+      // so we must map page-by-page.
+      for (int pg = 0; pg < (int)parent->mapped_info[i].npages; pg++) {
+        uint64 code_va = parent->mapped_info[i].va + (uint64)pg * PGSIZE;
+        uint64 code_pa = lookup_pa(parent->pagetable, code_va);
+        map_pages(child->pagetable, code_va, PGSIZE, code_pa,
+                  prot_to_type(PROT_EXEC | PROT_READ, 1));
+      }
+      sprint("do_fork map code segment of parent to child at va:%lx.\n",
+             parent->mapped_info[i].va);
 
       // after mapping, register the vm region (do not delete codes below!)
       child->mapped_info[child->total_mapped_region].va =
@@ -332,6 +341,13 @@ int do_fork(process *parent) {
 // added @lab4_challenge3
 //
 int do_exec(char *path, char *para) {
+  // Preserve path/argv strings before we tear down old user mappings. The
+  // caller may pass pointers from either heap or stack.
+  char path_copy[MAX_PATH_LEN];
+  char para_copy[MAX_PATH_LEN];
+  safestrcpy(path_copy, path, sizeof(path_copy));
+  safestrcpy(para_copy, para, sizeof(para_copy));
+
   // Step 1: unmap old CODE and DATA segments
   for (int i = 0; i < current->total_mapped_region; i++) {
     if (current->mapped_info[i].seg_type == CODE_SEGMENT) {
@@ -360,7 +376,7 @@ int do_exec(char *path, char *para) {
 
   // Step 3: load the new ELF into the current process
   // this sets current->trapframe->epc to the new entry point
-  load_bincode_from_host_elf(current, path);
+  load_bincode_from_host_elf(current, path_copy);
 
   // Step 4: clear the user stack
   uint64 stack_va =
@@ -373,12 +389,12 @@ int do_exec(char *path, char *para) {
 
   // Place the para string (grows downward)
   // 将 para 字符串放在用户栈上（向下增长）
-  int para_len = strlen(para) + 1; // including null terminator
+  int para_len = strlen(para_copy) + 1; // including null terminator
   sp -= para_len;
   sp = ROUNDDOWN(sp, 8); // 8-byte align the string start
   kassert(sp >= stack_va);
   char *pa_str = (char *)(stack_pa + (sp - stack_va));
-  memcpy(pa_str, para, para_len);
+  memcpy(pa_str, para_copy, para_len);
   uint64 para_va = sp; // VA of para string in user space
 
   // Build argv[] array on the stack (two entries: argv[0] and NULL terminator)
