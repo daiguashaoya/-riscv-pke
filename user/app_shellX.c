@@ -48,6 +48,7 @@ static int is_var_char(char c) {
   return is_var_start_char(c) || is_digit_char(c);
 }
 
+// 把src拷贝到dst
 static int safe_copy(char *dst, int cap, const char *src) {
   int i = 0;
 
@@ -66,7 +67,7 @@ static int safe_copy(char *dst, int cap, const char *src) {
   dst[i] = '\0';
   return 0;
 }
-
+// 把src的前n个字符拷贝到dst中，要求dst有足够的空间，如果src的长度不足n，则报错
 static int safe_copy_n(char *dst, int cap, const char *src, int n) {
   int i;
 
@@ -176,6 +177,7 @@ static int is_valid_var_name(const char *name) {
   return 1;
 }
 
+// 设置环境变量的函数，首先检查变量名是否合法，然后在env_keys中查找是否已经存在这个变量，如果存在则更新对应的值，如果不存在则添加一个新的变量。如果env_keys已经满了，则返回错误。
 static int env_set(const char *key, const char *value) {
   int idx;
 
@@ -183,14 +185,14 @@ static int env_set(const char *key, const char *value) {
     return -2;
   if (strlen(key) >= SHELL_ENV_KEY_LEN || strlen(value) >= SHELL_ENV_VAL_LEN)
     return -2;
-
+  // 查找变量名是否已经存在，如果存在则更新对应的值，如果不存在则添加一个新的变量
   idx = env_find(key);
   if (idx < 0) {
     if (env_count >= MAX_ENV)
       return -1;
     idx = env_count;
   }
-
+  // 把变量名和变量值分别复制到env_keys和env_vals中对应的槽位
   if (safe_copy(env_keys[idx], SHELL_ENV_KEY_LEN, key) < 0 ||
       safe_copy(env_vals[idx], SHELL_ENV_VAL_LEN, value) < 0)
     return -2;
@@ -212,6 +214,7 @@ static void print_env(void) {
     print_key_value(env_keys[i], env_vals[i]);
 }
 
+// 由于历史记录是一个循环缓冲区，所以实际槽位索引需要计算一下
 static int history_slot_for(int visible_index) {
   int oldest;
 
@@ -223,6 +226,7 @@ static int history_slot_for(int visible_index) {
 }
 
 static void history_push(const char *line) {
+  // 把新的历史记录内容复制到history_head指向的槽位，然后更新history_head和history_count
   safe_copy(history[history_head], SHELL_LINE_LEN, line);
   history_head = (history_head + 1) % MAX_HISTORY;
   if (history_count < MAX_HISTORY)
@@ -233,13 +237,14 @@ static int history_lookup(int visible_index, char *dst, int cap) {
   int slot = history_slot_for(visible_index);
   if (slot < 0)
     return -1;
+  // 把查询到的历史记录拷贝到dst中返回
   return safe_copy(dst, cap, history[slot]);
 }
 
 static void print_history(void) {
   int i;
   int oldest = (history_head - history_count + MAX_HISTORY) % MAX_HISTORY;
-
+  // 按照历史记录的顺序打印所有历史记录内容
   for (i = 0; i < history_count; i++) {
     int slot = (oldest + i) % MAX_HISTORY;
     printu("%d  ", i + 1);
@@ -251,15 +256,15 @@ static void print_history(void) {
 static int resolve_history_reference(const char *line, char *dst, int cap) {
   int i = 1;
   int value = 0;
-
+  // 如果行首不是'!'，则直接复制原始行到dst
   if (line[0] != '!')
     return safe_copy(dst, cap, line);
-
+  // 行首是!，但是不是!n的格式，则报错
   if (!is_digit_char(line[i])) {
     printu("shellX: invalid history reference, use !n\n");
     return -1;
   }
-
+  // 解析!n中的n部分，转换成整数value
   while (is_digit_char(line[i])) {
     value = value * 10 + (line[i] - '0');
     i++;
@@ -267,7 +272,7 @@ static int resolve_history_reference(const char *line, char *dst, int cap) {
 
   while (is_ws(line[i]))
     i++;
-
+  // 如果!n后面还有非空白字符，则是无效的历史记录引用
   if (line[i] != '\0') {
     printu("shellX: invalid history reference, use !n\n");
     return -1;
@@ -281,6 +286,7 @@ static int resolve_history_reference(const char *line, char *dst, int cap) {
   return 0;
 }
 
+// 变量替换的实现比较简单，直接扫描字符串，遇到$开头的变量名就替换成对应的值。
 static int expand_variables(const char *src, char *dst, int cap) {
   int i = 0;
 
@@ -312,6 +318,9 @@ static int expand_variables(const char *src, char *dst, int cap) {
   return 0;
 }
 
+// 解析命令段的函数，输入是一个命令段字符串，输出是解析到的命令和参数。要求命令段的格式是cmd [arg]
+// 如果命令段中没有参数，则para返回空字符串。如果命令或参数的长度超过了cap-1，则报错返回PARSE_TOO_LONG；
+// 如果命令段的格式不合法，则报错返回PARSE_INVALID；如果命令段为空，则返回PARSE_EMPTY；否则返回PARSE_OK。
 static int parse_one_command(char *segment, char *command, int command_cap,
                              char *para, int para_cap) {
   char *cursor = segment;
@@ -383,17 +392,18 @@ static int run_builtin_command(const char *command, const char *para) {
     }
 
     eq = strchr(para, '=');
+    // export命令的参数必须包含=符号，并且=符号不能是第一个字符，否则就是无效的格式
     if (eq == 0 || eq == para) {
       printu("shellX: usage: export NAME=value\n");
       return 0;
     }
-
+    // 把=符号前面的部分作为key
     if (safe_copy_n(key, SHELL_ENV_KEY_LEN, para, eq - para) < 0 ||
         !is_valid_var_name(key)) {
       printu("shellX: invalid variable name\n");
       return 0;
     }
-
+    // 把key和=符号后面的部分作为value
     ret = env_set(key, eq + 1);
     if (ret == -1)
       printu("shellX: environment table is full\n");
@@ -406,6 +416,7 @@ static int run_builtin_command(const char *command, const char *para) {
 }
 
 static void reap_background_children(void) {
+  // wait(0)会等待任意一个子进程结束，并返回这个子进程的pid，如果没有子进程结束则返回-1。我们在一个循环中调用wait(0)，直到没有子进程结束为止，这样就可以回收所有已经结束的后台子进程了。
   int pid = wait(0);
   while (pid > 0) {
     printu("[bg] pid %d finished.\n", pid);
@@ -578,6 +589,7 @@ static int run_pipeline_segment(char *segment, int background) {
     return 0;
   }
 
+  // 解析左右两边的命令和参数，要求格式都是cmd [arg]
   parse_left =
       parse_one_command(left, left_cmd, sizeof(left_cmd), left_para,
                         sizeof(left_para));
@@ -592,12 +604,12 @@ static int run_pipeline_segment(char *segment, int background) {
     printu("shellX: invalid pipe format, use cmd [arg] | cmd [arg]\n");
     return 0;
   }
-
+  // 目前内建命令不支持管道，如果左右两边的命令有一个是内建命令，则报错
   if (is_builtin_command(left_cmd) || is_builtin_command(right_cmd)) {
     printu("shellX: builtins are not supported in pipelines\n");
     return 0;
   }
-
+  // 准备左右两边的命令，主要是解析命令路径，检查参数长度等，如果有问题则报错
   if (prepare_external_command(left_cmd, left_para, left_real_cmd,
                                sizeof(left_real_cmd)) < 0)
     return 0;
@@ -609,7 +621,8 @@ static int run_pipeline_segment(char *segment, int background) {
     printu("shellX: pipe creation failed\n");
     return 0;
   }
-
+  // 创建管道后，fork出两个子进程，分别执行左右两边的命令。
+  //左边的命令把标准输出重定向到管道的写端，右边的命令把标准输入重定向到管道的读端。
   pid1 = fork();
   if (pid1 == 0) {
     dup2(fd[1], 1);
@@ -640,7 +653,7 @@ static int run_pipeline_segment(char *segment, int background) {
     wait(pid1);
     return 0;
   }
-
+  // 管道命令的前台/后台执行逻辑和普通命令稍微复杂一些，如果是后台执行，则直接返回，不等待子进程结束；如果是前台执行，则需要等两个子进程都结束后再返回。
   if (background) {
     printu("[bg] pipeline started: %d | %d\n", pid1, pid2);
   } else {
@@ -659,7 +672,7 @@ static int run_one_segment(char *segment, int background) {
   char real_cmd[MAX_PATH_LEN];
   int parse_ret;
   int pid;
-
+  // 如果命令段中有|符号，则交给run_pipeline_segment处理
   if (strchr(segment, '|') != 0)
     return run_pipeline_segment(segment, background);
 
@@ -676,6 +689,7 @@ static int run_one_segment(char *segment, int background) {
   if (parse_ret == PARSE_EMPTY)
     return 0;
 
+  // 目前内建命令不支持参数，如果para不为空，则报错
   if (is_builtin_command(command))
     return run_builtin_command(command, para);
 
@@ -686,6 +700,7 @@ static int run_one_segment(char *segment, int background) {
   if (pid == 0) {
     exec_or_exit(command, para, real_cmd);
   } else if (pid > 0) {
+    // 普通命令的前台/后台执行逻辑比较简单，如果是后台执行，则直接返回，不等待子进程结束。
     if (background) {
       printu("[bg] pid %d started: %s\n", pid, real_cmd);
     } else {
@@ -711,7 +726,8 @@ static int process_one_line(char *line) {
     cursor = trim_ws(cursor);
     if (*cursor == '\0')
       break;
-
+    // 查找当前命令段中是否有&符号，如果有，则把&符号替换成字符串结束符
+    // 并把background设置为1，表示这个命令需要后台执行
     amp = strchr(cursor, '&');
     background = (amp != 0);
     if (amp)
@@ -738,13 +754,14 @@ int main(int argc, char *argv[]) {
   char *expanded_line = naive_malloc();
 
   printu("\n======== ShellX Start ========\n\n");
+   // 初始化环境变量
   init_shell_env();
 
   while (1) {
     int n = 0;
     int should_exit = 0;
     char *line;
-
+  // 在每次显示提示符前，先回收所有后台子进程
     reap_background_children();
 
     printu("\033[1;32mpke:/ $\033[0m ");
@@ -753,7 +770,7 @@ int main(int argc, char *argv[]) {
       n = read_u(0, buf, SHELL_LINE_LEN - 1);
     if (n < 0)
       continue;
-
+    // 在每次读取输入后，再回收所有后台子进程
     reap_background_children();
     buf[n] = '\0';
 
@@ -769,16 +786,16 @@ int main(int argc, char *argv[]) {
         while (*next == '\n' || *next == '\r')
           next++;
       }
-
+      // 去除行首和行尾的空白字符，如果行不为空，则进行历史记录替换和变量替换后执行
       line = trim_ws(line);
       if (*line != '\0') {
         char *expanded;
-
+        // history_line中就是查询到的历史记录内容
         if (resolve_history_reference(line, history_line, SHELL_LINE_LEN) < 0) {
           line = next;
           continue;
         }
-
+        // expanded_line中是进行变量替换后的行内容
         if (expand_variables(history_line, expanded_line, SHELL_LINE_LEN) < 0) {
           printu("shellX: expanded line is too long\n");
           line = next;
