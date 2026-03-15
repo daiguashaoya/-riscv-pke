@@ -83,6 +83,7 @@ static void exec_or_exit(char *command, char *para, char *real_cmd) {
 }
 
 static int run_pipeline_segment(char *segment, int background) {
+  // 查找管道符，并确保只有一个管道符
   char *pipe_pos = strchr(segment, '|');
   if (pipe_pos == 0)
     return 0;
@@ -169,6 +170,7 @@ static int run_pipeline_segment(char *segment, int background) {
 
 static int run_one_segment(char *segment, int background, char *command,
                            char *para, char *real_cmd) {
+// 发现有管道符，交给专门的函数处理
   if (strchr(segment, '|') != 0)
     return run_pipeline_segment(segment, background);
 

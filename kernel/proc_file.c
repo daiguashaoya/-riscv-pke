@@ -103,6 +103,7 @@ static int pipe_read(pipe_t *p, char *dst, uint64 count) {
       return 0;
 
     // Otherwise block until data becomes available or writers close.
+    // 如果有写者，那就让读进程先等待
     current->status = BLOCKED;
     insert_to_wait_queue(&p->read_wait_queue, current);
     schedule();
@@ -112,6 +113,7 @@ static int pipe_read(pipe_t *p, char *dst, uint64 count) {
   if (n > p->len)
     n = p->len;
 
+  // 从环形缓冲区中读取数据
   uint32 first = n;
   uint32 till_end = PIPE_SIZE - p->rpos;
   if (first > till_end)
@@ -124,7 +126,7 @@ static int pipe_read(pipe_t *p, char *dst, uint64 count) {
   p->rpos = (p->rpos + n) % PIPE_SIZE;
   p->len -= n;
 
-  // If writers were blocked due to full buffer, reading makes room.
+  // If writers were blocked due to 缓冲区满了, reading makes room.
   pipe_wake_writers(p);
   return (int)n;
 }
@@ -139,6 +141,7 @@ static int pipe_write(pipe_t *p, const char *src, uint64 count) {
     if (p->readers == 0)
       return (int)count;
 
+    // 缓冲区满了 就阻塞等待
     while (p->len == PIPE_SIZE) {
       if (p->readers == 0)
         return (int)count;
@@ -148,11 +151,14 @@ static int pipe_write(pipe_t *p, const char *src, uint64 count) {
       schedule();
     }
 
+    //剩余空间
     uint32 space = PIPE_SIZE - p->len;
+    // 还想写多少
     uint32 want = (uint32)(count - written);
     if (want > space)
       want = space;
 
+    // 写入环形缓冲区
     uint32 first = want;
     uint32 till_end = PIPE_SIZE - p->wpos;
     if (first > till_end)
@@ -247,6 +253,7 @@ static void bump_ref_on_dup(struct file *pfile) {
   if (pfile->status == FD_OPENED_PIPE) {
     pipe_t *p = (pipe_t *)pfile->pipe;
     if (p) {
+    // 增加管道的读写端口技术，这里说的端口就是指当前的文件结构是读端还是写端
       if (pfile->readable)
         p->readers++;
       if (pfile->writable)
@@ -295,6 +302,7 @@ void close_all_files(proc_file_management *pfiles) {
   pfiles->nfiles = 0;
 }
 
+// 将父进程的文件管理结构复制到子进程，增加引用计数
 void dup_proc_file_management(proc_file_management *dst,
                               proc_file_management *src) {
   if (!dst || !src)
@@ -306,6 +314,7 @@ void dup_proc_file_management(proc_file_management *dst,
   for (int fd = 0; fd < MAX_FILES; fd++) {
     dst->opened_files[fd] = src->opened_files[fd];
     if (dst->opened_files[fd].status != FD_NONE)
+    // 增加引用计数，避免被过早释放
       bump_ref_on_dup(&dst->opened_files[fd]);
   }
 }
@@ -399,6 +408,7 @@ int do_write(int fd, char *buf, uint64 count) {
 
   if (pfile->writable == 0) panic("do_write: cannot write file!\n");
 
+// 这里就是重定向了
   if (pfile->status == FD_OPENED_PIPE) {
     return pipe_write((pipe_t *)pfile->pipe, buf, count);
   }
