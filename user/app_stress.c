@@ -1,10 +1,21 @@
 #include "user/user_lib.h"
 #include "util/types.h"
 
+#ifndef STRESS_CHILDREN
 #define STRESS_CHILDREN 28
+#endif
+
+#ifndef STRESS_ROUNDS
 #define STRESS_ROUNDS 64
+#endif
+
+#ifndef STRESS_COMPUTE_SPINS
 #define STRESS_COMPUTE_SPINS 20000UL
+#endif
+
+#ifndef STRESS_IO_BURST
 #define STRESS_IO_BURST 4
+#endif
 
 // 纯计算任务
 static uint64 compute_burst(int slot, int round) {
@@ -20,6 +31,7 @@ static uint64 compute_burst(int slot, int round) {
   return acc;
 }
 
+// 一共4次系统调用printu
 static void io_burst(int slot, int round, uint64 acc) {
   printu("[stress] slot=%d round=%d acc=%lx ", slot, round, acc & 0xfffffUL);
   for (int i = 0; i < STRESS_IO_BURST; i++) {
@@ -29,6 +41,7 @@ static void io_burst(int slot, int round, uint64 acc) {
   printu("\n");
 }
 
+// 28*64 = 1792次循环调度
 static void child_main(int slot) {
   for (int round = 0; round < STRESS_ROUNDS; round++) {
     uint64 acc = compute_burst(slot, round);
