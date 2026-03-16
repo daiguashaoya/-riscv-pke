@@ -88,6 +88,7 @@ SUPPORTED_USER_APPS := \
 	app_cat \
 	app_grep \
 	app_echo \
+	app_stress \
 	app0 \
 	app1 \
 	app_alloc0 \
